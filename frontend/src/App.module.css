@@ -521,23 +521,23 @@
 }
 
 .sendBtn {
-  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 49px;
   padding: 10px 22px;
   font-size: 0.85rem;
   font-weight: 700;
-  transition: opacity 150ms;
+  transition: background 150ms;
   white-space: nowrap;
 }
 
 .sendBtn:hover {
-  opacity: 0.9;
+  background: var(--accent-hover);
 }
 
 .sendBtn:disabled {
-  opacity: 0.4;
+  opacity: 0.8;
   cursor: not-allowed;
 }
 
