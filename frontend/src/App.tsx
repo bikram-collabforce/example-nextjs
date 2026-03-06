@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { DashboardData, ChatMessage } from "./types";
 import styles from "./App.module.css";
 
-const API_BASE = import.meta.env.VITE_API_URL || "";
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD
+    ? "https://employee-agent-api.up.railway.app"
+    : "");
 
 export default function App() {
   const [data, setData] = useState<DashboardData | null>(null);
