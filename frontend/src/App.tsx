@@ -69,130 +69,182 @@ export default function App() {
   }
 
   return (
-    <div className={styles.page}>
-      {/* Highlight banner */}
-      <div className={styles.highlight}>
-        <strong>{data.highlight.label}</strong> {data.highlight.text}
-      </div>
-
-      {/* Section heading */}
-      <div className={styles.sectionHeader}>Your day at a glance</div>
-
-      {/* Four-column grid */}
-      <div className={styles.grid}>
-        {/* Column 1 — Yesterday's Meeting Summaries */}
-        <div className={styles.column}>
-          <div className={styles.columnTitle}>
-            <span className={styles.columnIcon}>📋</span>
-            Yesterday's Meeting summaries
-          </div>
-          {data.meetingSummaries.map((m) => (
-            <div key={m.id} className={styles.meetingCard}>
-              <div className={styles.meetingTitle}>{m.title}</div>
-              <div className={styles.meetingSummary}>{m.summary}</div>
-              <div className={styles.cardActions}>
-                <button className={styles.iconBtn} title="Copy">📄</button>
-                <button className={styles.iconBtn} title="Comment">💬</button>
-                <button className={styles.iconBtn} title="Save">📁</button>
-                <button className={styles.iconBtn} title="Share">↗</button>
-                <button className={styles.iconBtn} title="More">⋯</button>
-              </div>
-            </div>
-          ))}
+    <div className={styles.layout}>
+      {/* ─── Sidebar ─── */}
+      <aside className={styles.sidebar}>
+        <div className={styles.logo}>
+          <span className={styles.logoIcon}>⚡</span>
+          Digital Twin
         </div>
 
-        {/* Column 2 — Follow-ups from yesterday */}
-        <div className={styles.column}>
-          <div className={styles.columnTitle}>
-            <span className={styles.columnIcon}>➡️</span>
-            Follow-ups from yesterday
+        <div className={styles.sidebarSection}>Main</div>
+        <a className={styles.navItemActive} href="#">
+          <span className={styles.navIcon}>📊</span> Dashboard
+        </a>
+        <a className={styles.navItem} href="#">
+          <span className={styles.navIcon}>💬</span> Chat
+        </a>
+        <a className={styles.navItem} href="#">
+          <span className={styles.navIcon}>📅</span> Calendar
+        </a>
+
+        <div className={styles.sidebarSection}>Tools</div>
+        <a className={styles.navItem} href="#">
+          <span className={styles.navIcon}>📝</span> Notes
+        </a>
+        <a className={styles.navItem} href="#">
+          <span className={styles.navIcon}>📁</span> Files
+        </a>
+        <a className={styles.navItem} href="#">
+          <span className={styles.navIcon}>⚙️</span> Settings
+        </a>
+
+        <hr className={styles.sidebarDivider} />
+
+        <div className={styles.sidebarFooter}>
+          <div className={styles.sidebarFooterText}>
+            Digital Twin v0.1<br />Your AI work assistant
           </div>
-          {data.followUps.map((f) => (
-            <div key={f.id} className={styles.followUp}>
-              <span className={styles.followUpArrow}>→</span>
-              <div className={styles.followUpContent}>
-                <div className={styles.followUpText}>{f.text}</div>
+        </div>
+      </aside>
+
+      {/* ─── Main content ─── */}
+      <main className={styles.main}>
+        {/* Top bar */}
+        <div className={styles.topBar}>
+          <div>
+            <div className={styles.breadcrumb}>
+              Pages / <span>Dashboard</span>
+            </div>
+            <h1 className={styles.pageTitle}>Your Day at a Glance</h1>
+          </div>
+        </div>
+
+        {/* Highlight */}
+        <div className={styles.highlight}>
+          <strong>{data.highlight.label}</strong> {data.highlight.text}
+        </div>
+
+        {/* Four-column grid */}
+        <div className={styles.grid}>
+          {/* Column 1 — Yesterday's Meetings */}
+          <div className={styles.column}>
+            <div className={styles.columnTitle}>
+              <span className={`${styles.columnIcon} ${styles.iconMeetings}`}>
+                📋
+              </span>
+              Meeting Summaries
+            </div>
+            {data.meetingSummaries.map((m) => (
+              <div key={m.id} className={styles.meetingCard}>
+                <div className={styles.meetingTitle}>{m.title}</div>
+                <div className={styles.meetingSummary}>{m.summary}</div>
                 <div className={styles.cardActions}>
-                  <button className={styles.iconBtn} title="Done">✓</button>
-                  <button className={styles.iconBtn} title="Snooze">⏰</button>
-                  <button className={styles.iconBtn} title="Save">📁</button>
+                  <button className={styles.iconBtn} title="Copy">📄</button>
                   <button className={styles.iconBtn} title="Comment">💬</button>
+                  <button className={styles.iconBtn} title="Save">📁</button>
+                  <button className={styles.iconBtn} title="Share">↗</button>
                   <button className={styles.iconBtn} title="More">⋯</button>
                 </div>
               </div>
+            ))}
+          </div>
+
+          {/* Column 2 — Follow-ups */}
+          <div className={styles.column}>
+            <div className={styles.columnTitle}>
+              <span className={`${styles.columnIcon} ${styles.iconFollowups}`}>
+                ➡️
+              </span>
+              Follow-ups
             </div>
-          ))}
+            {data.followUps.map((f) => (
+              <div key={f.id} className={styles.followUp}>
+                <span className={styles.followUpDot} />
+                <div className={styles.followUpContent}>
+                  <div className={styles.followUpText}>{f.text}</div>
+                  <div className={styles.cardActions}>
+                    <button className={styles.iconBtn} title="Done">✓</button>
+                    <button className={styles.iconBtn} title="Snooze">⏰</button>
+                    <button className={styles.iconBtn} title="Save">📁</button>
+                    <button className={styles.iconBtn} title="Comment">💬</button>
+                    <button className={styles.iconBtn} title="More">⋯</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Column 3 — Today */}
+          <div className={styles.column}>
+            <div className={styles.columnTitle}>
+              <span className={`${styles.columnIcon} ${styles.iconToday}`}>
+                📅
+              </span>
+              Today
+            </div>
+            <div>
+              <div className={styles.statRow}>
+                <div className={styles.bigNumber}>
+                  {data.todaySchedule.meetingCount}
+                </div>
+                <div className={styles.meetingMeta}>
+                  meetings · {data.todaySchedule.pendingApprovals} pending
+                </div>
+              </div>
+            </div>
+            {data.todaySchedule.events.map((e) => (
+              <div key={e.id} className={styles.event}>
+                <div className={styles.eventHeader}>
+                  <span>
+                    <span className={styles.eventTime}>{e.time}</span>{" "}
+                    <span className={styles.eventTitle}>{e.title}</span>
+                  </span>
+                  {e.tag && <span className={styles.eventTag}>{e.tag}</span>}
+                </div>
+                <div className={styles.eventDesc}>{e.description}</div>
+                <div className={styles.eventActions}>
+                  {e.actions.map((a) => (
+                    <a key={a} href="#">{a}</a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Column 4 — Pending */}
+          <div className={styles.column}>
+            <div className={styles.columnTitle}>
+              <span className={`${styles.columnIcon} ${styles.iconPending}`}>
+                ⏳
+              </span>
+              Pending Items
+            </div>
+            {data.pendingItems.map((p) => (
+              <div key={p.id} className={styles.pendingItem}>
+                <div className={styles.pendingHeader}>
+                  <span className={styles.pendingTitle}>{p.title}</span>
+                  {p.badge === "Urgent" && (
+                    <span className={styles.badgeUrgent}>Urgent</span>
+                  )}
+                  {p.badge === "Reminder" && (
+                    <span className={styles.badgeReminder}>Reminder</span>
+                  )}
+                </div>
+                <div className={styles.pendingDesc}>{p.description}</div>
+                <div className={styles.pendingActions}>
+                  {p.actions.map((a) => (
+                    <a key={a} href="#">{a}</a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Column 3 — Today at a glance */}
-        <div className={styles.column}>
-          <div className={styles.columnTitle}>
-            <span className={styles.columnIcon}>📅</span>
-            Today at a glance
-          </div>
-          <div>
-            <div className={styles.bigNumber}>
-              {data.todaySchedule.meetingCount}
-            </div>
-            <div className={styles.meetingMeta}>
-              meetings · {data.todaySchedule.pendingApprovals} pending approvals
-            </div>
-          </div>
-          {data.todaySchedule.events.map((e) => (
-            <div key={e.id} className={styles.event}>
-              <div className={styles.eventHeader}>
-                <span>
-                  <span className={styles.eventTime}>{e.time}</span>{" "}
-                  <span className={styles.eventTitle}>{e.title}</span>
-                </span>
-                {e.tag && <span className={styles.eventTag}>{e.tag}</span>}
-              </div>
-              <div className={styles.eventDesc}>{e.description}</div>
-              <div className={styles.eventActions}>
-                {e.actions.map((a) => (
-                  <a key={a} href="#">
-                    {a}
-                  </a>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Column 4 — Pending items */}
-        <div className={styles.column}>
-          <div className={styles.columnTitle}>
-            <span className={styles.columnIcon}>⏳</span>
-            Pending items
-          </div>
-          {data.pendingItems.map((p) => (
-            <div key={p.id} className={styles.pendingItem}>
-              <div className={styles.pendingHeader}>
-                <span className={styles.pendingTitle}>{p.title}</span>
-                {p.badge === "Urgent" && (
-                  <span className={styles.badgeUrgent}>Urgent</span>
-                )}
-                {p.badge === "Reminder" && (
-                  <span className={styles.badgeReminder}>Reminder</span>
-                )}
-              </div>
-              <div className={styles.pendingDesc}>{p.description}</div>
-              <div className={styles.pendingActions}>
-                {p.actions.map((a) => (
-                  <a key={a} href="#">
-                    {a}
-                  </a>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Bottom chat bar */}
-      <div className={styles.bottomBar}>
-        <div className={styles.bottomLabel}>Dashboard</div>
-        <div className={styles.chatArea}>
+        {/* Chat bar */}
+        <div className={styles.chatBar}>
+          <div className={styles.chatLabel}>AI Assistant</div>
           {chatMessages.length > 0 && (
             <div className={styles.chatMessages}>
               {chatMessages.map((msg) => (
@@ -224,7 +276,7 @@ export default function App() {
             </svg>
             <input
               className={styles.chatInput}
-              placeholder="Ask about your day…"
+              placeholder="Ask about your day, meetings, expenses…"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => {
@@ -240,7 +292,7 @@ export default function App() {
             </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
