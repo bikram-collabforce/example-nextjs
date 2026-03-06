@@ -125,6 +125,57 @@ export default function App() {
           <strong>{data.highlight.label}</strong> {data.highlight.text}
         </div>
 
+        {/* Chat bar */}
+        <div className={styles.chatBar}>
+          <div className={styles.chatLabel}>AI Assistant</div>
+          {chatMessages.length > 0 && (
+            <div className={styles.chatMessages}>
+              {chatMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={
+                    msg.role === "user"
+                      ? styles.chatBubbleUser
+                      : styles.chatBubbleAssistant
+                  }
+                >
+                  {msg.text}
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+          <div className={styles.chatInputRow}>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              className={styles.chatInput}
+              placeholder="Ask about your day, meetings, expenses…"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") sendChat();
+              }}
+            />
+            <button
+              className={styles.sendBtn}
+              onClick={sendChat}
+              disabled={!chatInput.trim() || sending}
+            >
+              {sending ? "…" : "Send"}
+            </button>
+          </div>
+        </div>
+
         {/* Four-column grid */}
         <div className={styles.grid}>
           {/* Column 1 — Yesterday's Meetings */}
@@ -242,56 +293,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Chat bar */}
-        <div className={styles.chatBar}>
-          <div className={styles.chatLabel}>AI Assistant</div>
-          {chatMessages.length > 0 && (
-            <div className={styles.chatMessages}>
-              {chatMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={
-                    msg.role === "user"
-                      ? styles.chatBubbleUser
-                      : styles.chatBubbleAssistant
-                  }
-                >
-                  {msg.text}
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-          <div className={styles.chatInputRow}>
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.35-4.35" />
-            </svg>
-            <input
-              className={styles.chatInput}
-              placeholder="Ask about your day, meetings, expenses…"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") sendChat();
-              }}
-            />
-            <button
-              className={styles.sendBtn}
-              onClick={sendChat}
-              disabled={!chatInput.trim() || sending}
-            >
-              {sending ? "…" : "Send"}
-            </button>
-          </div>
-        </div>
       </main>
     </div>
   );
