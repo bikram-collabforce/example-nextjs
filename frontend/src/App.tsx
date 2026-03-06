@@ -116,7 +116,7 @@ export default function App() {
             <div className={styles.breadcrumb}>
               Pages / <span>Dashboard</span>
             </div>
-            <h1 className={styles.pageTitle}>Your Day at a Glance</h1>
+            <h1 className={styles.pageTitle}>Your Day at a Glance !!!</h1>
           </div>
         </div>
 
