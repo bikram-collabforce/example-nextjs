@@ -110,7 +110,7 @@
   gap: 2px;
   margin-top: 6px;
   padding-left: 14px;
-  max-height: 240px;
+  max-height: 350px;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -143,11 +143,12 @@
 }
 
 .sidebarFooter {
-  margin-top: 0;
+  margin-top: auto;
   padding: 16px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: var(--border-radius);
   text-align: center;
+  flex-shrink: 0;
 }
 
 .sidebarFooterText {
