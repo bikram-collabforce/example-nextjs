@@ -2,11 +2,11 @@ import { useState, useCallback } from "react";
 import styles from "./Login.module.css";
 
 const DEMO_EMAILS = [
-  "developer@collabforce.com",
-  "manager@collabforce.com",
-  "pm@collabforce.com",
-  "leadership@collabforce.com",
-  "admin@collabforce.com",
+  "developer@collabforce.org",
+  "manager@collabforce.org",
+  "pm@collabforce.org",
+  "leadership@collabforce.org",
+  "admin@collabforce.org",
 ];
 const DEMO_PASSWORD = "Abcd@1234";
 
@@ -84,7 +84,7 @@ export default function Login({ apiBase, onLogin }: LoginProps) {
               id="email"
               className={styles.input}
               type="email"
-              placeholder="you@collabforce.com"
+              placeholder="you@collabforce.org"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"

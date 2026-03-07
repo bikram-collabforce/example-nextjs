@@ -25,11 +25,11 @@ interface AdminTableStat {
 }
 
 const USER_PHOTOS: Record<string, string> = {
-  "developer@collabforce.com": "https://randomuser.me/api/portraits/men/32.jpg",
-  "manager@collabforce.com": "https://randomuser.me/api/portraits/women/44.jpg",
-  "pm@collabforce.com": "https://randomuser.me/api/portraits/men/75.jpg",
-  "leadership@collabforce.com": "https://randomuser.me/api/portraits/women/68.jpg",
-  "admin@collabforce.com": "https://randomuser.me/api/portraits/men/1.jpg",
+  "developer@collabforce.org": "https://randomuser.me/api/portraits/men/32.jpg",
+  "manager@collabforce.org": "https://randomuser.me/api/portraits/women/44.jpg",
+  "pm@collabforce.org": "https://randomuser.me/api/portraits/men/75.jpg",
+  "leadership@collabforce.org": "https://randomuser.me/api/portraits/women/68.jpg",
+  "admin@collabforce.org": "https://randomuser.me/api/portraits/men/1.jpg",
 };
 
 export default function App() {

@@ -172,7 +172,7 @@ export async function initDb() {
       const hash = await bcrypt.hash("Abcd@1234", 10);
       await pool.query(
         "INSERT INTO users (email, password, name, role, persona_id, is_admin) VALUES ($1, $2, $3, $4, NULL, TRUE) ON CONFLICT (email) DO NOTHING",
-        ["admin@collabforce.com", hash, "Admin User", "Admin"],
+        ["admin@collabforce.org", hash, "Admin User", "Admin"],
       );
     }
     const { rows: statsCheck } = await pool.query("SELECT COUNT(*) FROM daily_table_stats");
@@ -274,10 +274,10 @@ async function seedAll() {
 
   const hash = await bcrypt.hash("Abcd@1234", 10);
   const users = [
-    { email: "developer@collabforce.com", name: "Alex Johnson", role: "Developer", persona: "Engineer" },
-    { email: "manager@collabforce.com", name: "Sarah Mitchell", role: "Manager", persona: "Manager" },
-    { email: "pm@collabforce.com", name: "David Chen", role: "Project Manager", persona: "Product Manager" },
-    { email: "leadership@collabforce.com", name: "Rachel Torres", role: "SVP of Engineering", persona: "Executive" },
+    { email: "developer@collabforce.org", name: "Alex Johnson", role: "Developer", persona: "Engineer" },
+    { email: "manager@collabforce.org", name: "Sarah Mitchell", role: "Manager", persona: "Manager" },
+    { email: "pm@collabforce.org", name: "David Chen", role: "Project Manager", persona: "Product Manager" },
+    { email: "leadership@collabforce.org", name: "Rachel Torres", role: "SVP of Engineering", persona: "Executive" },
   ];
 
   for (const u of users) {
@@ -289,7 +289,7 @@ async function seedAll() {
 
   await pool.query(
     "INSERT INTO users (email, password, name, role, persona_id, is_admin) VALUES ($1, $2, $3, $4, NULL, TRUE) ON CONFLICT (email) DO NOTHING",
-    ["admin@collabforce.com", hash, "Admin User", "Admin"],
+    ["admin@collabforce.org", hash, "Admin User", "Admin"],
   );
 
   const today = new Date().toISOString().slice(0, 10);
