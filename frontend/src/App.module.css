@@ -675,8 +675,16 @@
   color: var(--text-muted);
 }
 
-.chatInput {
+.chatInputWrap {
+  position: relative;
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.chatInput {
+  width: 100%;
   border: none;
   outline: none;
   font-size: 0.9rem;
@@ -688,6 +696,32 @@
 
 .chatInput::placeholder {
   color: var(--text-muted);
+}
+
+.callBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(102, 78, 200, 0.28);
+  border-radius: var(--border-radius-sm) 17px 17px var(--border-radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.callBtn:hover {
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.callIcon {
+  width: 20px;
+  height: 20px;
 }
 
 .sendBtn {
