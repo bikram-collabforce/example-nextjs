@@ -20,12 +20,13 @@ export default function Login({ apiBase, onLogin }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [filled, setFilled] = useState<string | null>(null);
 
-  const copyToClipboard = useCallback((text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 1500);
+  const useEmail = useCallback((em: string) => {
+    setEmail(em);
+    setPassword(DEMO_PASSWORD);
+    setFilled(em);
+    setTimeout(() => setFilled(null), 1500);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,7 +69,7 @@ export default function Login({ apiBase, onLogin }: LoginProps) {
           <span className={styles.logoIcon}>⚡</span>
           <span className={styles.logoText}>Digital Twin</span>
         </div>
-        <p className={styles.subtitle}>Sign in to your AI work assistant</p>
+        <p className={styles.subtitle}>Sign in to your Digital Twin Assistant</p>
 
         {error && <div className={styles.error}>{error}</div>}
 
@@ -132,9 +133,9 @@ export default function Login({ apiBase, onLogin }: LoginProps) {
                 <button
                   type="button"
                   className={styles.copyBtn}
-                  onClick={() => copyToClipboard(em, em)}
+                  onClick={() => useEmail(em)}
                 >
-                  {copied === em ? "Copied!" : "Copy"}
+                  {filled === em ? "Filled!" : "Use"}
                 </button>
               </div>
             ))}
@@ -142,13 +143,6 @@ export default function Login({ apiBase, onLogin }: LoginProps) {
           <div className={styles.demoRow} style={{ marginTop: 8 }}>
             <span className={styles.demoPasswordLabel}>Password:</span>
             <code className={styles.demoEmail}>{DEMO_PASSWORD}</code>
-            <button
-              type="button"
-              className={styles.copyBtn}
-              onClick={() => copyToClipboard(DEMO_PASSWORD, "password")}
-            >
-              {copied === "password" ? "Copied!" : "Copy"}
-            </button>
           </div>
         </div>
 
