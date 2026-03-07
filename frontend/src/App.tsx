@@ -15,6 +15,13 @@ interface AuthUser {
   role: string;
 }
 
+const USER_PHOTOS: Record<string, string> = {
+  "developer@collabforce.com": "https://randomuser.me/api/portraits/men/32.jpg",
+  "manager@collabforce.com": "https://randomuser.me/api/portraits/women/44.jpg",
+  "pm@collabforce.com": "https://randomuser.me/api/portraits/men/75.jpg",
+  "leadership@collabforce.com": "https://randomuser.me/api/portraits/women/68.jpg",
+};
+
 export default function App() {
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem("token"),
@@ -171,6 +178,11 @@ export default function App() {
             <h1 className={styles.pageTitle}>Your Day at a Glance</h1>
           </div>
           <div className={styles.userMenu}>
+            <img
+              className={styles.userAvatar}
+              src={USER_PHOTOS[user.email] || `https://randomuser.me/api/portraits/men/1.jpg`}
+              alt={user.name}
+            />
             <div className={styles.userInfo}>
               <span className={styles.userName}>{user.name}</span>
               <span className={styles.userRole}>{user.role}</span>
