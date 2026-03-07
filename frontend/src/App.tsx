@@ -56,6 +56,16 @@ export default function App() {
   const [userForm, setUserForm] = useState({ email: "", password: "", name: "", role: "", persona_id: "" });
   const [createUserError, setCreateUserError] = useState<string | null>(null);
   const [createUserSuccess, setCreateUserSuccess] = useState(false);
+  interface UserListItem { id: number; email: string; name: string; role: string; personaId: number | null; isAdmin: boolean }
+  const [usersList, setUsersList] = useState<UserListItem[]>([]);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersPage, setUsersPage] = useState(1);
+  const usersLimit = 10;
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
+  const [savingUser, setSavingUser] = useState(false);
   const [factoryResetConfirmOpen, setFactoryResetConfirmOpen] = useState(false);
   const [factoryResetLoading, setFactoryResetLoading] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
@@ -177,6 +187,26 @@ export default function App() {
   }, [token, activeView, adminSubTab]);
 
   useEffect(() => {
+    if (!token || activeView !== "administration" || adminSubTab !== "users") return;
+    setUsersError(null);
+    setUsersLoading(true);
+    fetch(`${API_BASE}/api/admin/users?page=${usersPage}&limit=${usersLimit}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (r.status === 403) throw new Error("Access denied.");
+        if (!r.ok) throw new Error("Failed to load users.");
+        return r.json();
+      })
+      .then((d) => {
+        setUsersList(d.users || []);
+        setUsersTotal(d.total ?? 0);
+      })
+      .catch((e) => setUsersError(e.message || "Failed to load users."))
+      .finally(() => setUsersLoading(false));
+  }, [token, activeView, adminSubTab, usersPage]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
@@ -261,40 +291,112 @@ export default function App() {
     [token],
   );
 
-  const createUser = useCallback(async () => {
+  const openUserModalCreate = useCallback(() => {
+    setEditingUser(null);
+    setUserForm({ email: "", password: "", name: "", role: "", persona_id: "" });
+    setCreateUserError(null);
+    setCreateUserSuccess(false);
+    setUserModalOpen(true);
+  }, []);
+
+  const openUserModalEdit = useCallback((u: UserListItem) => {
+    setEditingUser(u);
+    setUserForm({
+      email: u.email,
+      password: "",
+      name: u.name,
+      role: u.role,
+      persona_id: u.personaId != null ? String(u.personaId) : "",
+    });
+    setCreateUserError(null);
+    setCreateUserSuccess(false);
+    setUserModalOpen(true);
+  }, []);
+
+  const closeUserModal = useCallback(() => {
+    setUserModalOpen(false);
+    setEditingUser(null);
+    setCreateUserError(null);
+    setCreateUserSuccess(false);
+  }, []);
+
+  const saveUser = useCallback(async () => {
     if (!token) return;
     setCreateUserError(null);
     setCreateUserSuccess(false);
-    if (!userForm.email.trim() || !userForm.password) {
-      setCreateUserError("Email and password are required.");
+    setSavingUser(true);
+    const isEdit = editingUser != null;
+    if (!userForm.email.trim()) {
+      setCreateUserError("Email is required.");
+      setSavingUser(false);
+      return;
+    }
+    if (!isEdit && !userForm.password) {
+      setCreateUserError("Password is required for new users.");
+      setSavingUser(false);
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/api/admin/users`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          email: userForm.email.trim(),
-          password: userForm.password,
-          name: userForm.name.trim() || undefined,
-          role: userForm.role.trim() || undefined,
-          persona_id: userForm.persona_id ? parseInt(userForm.persona_id, 10) : undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setCreateUserError(data.error || "Failed to create user.");
-        return;
+      if (isEdit) {
+        const res = await fetch(`${API_BASE}/api/admin/users/${editingUser.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: userForm.email.trim(),
+            password: userForm.password.trim() || undefined,
+            name: userForm.name.trim() || undefined,
+            role: userForm.role.trim() || undefined,
+            persona_id: userForm.persona_id ? parseInt(userForm.persona_id, 10) : null,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setCreateUserError(data.error || "Failed to update user.");
+          return;
+        }
+      } else {
+        const res = await fetch(`${API_BASE}/api/admin/users`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: userForm.email.trim(),
+            password: userForm.password,
+            name: userForm.name.trim() || undefined,
+            role: userForm.role.trim() || undefined,
+            persona_id: userForm.persona_id ? parseInt(userForm.persona_id, 10) : undefined,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setCreateUserError(data.error || "Failed to create user.");
+          return;
+        }
+        setUserForm({ email: "", password: "", name: "", role: "", persona_id: "" });
       }
-      setCreateUserSuccess(true);
-      setUserForm({ email: "", password: "", name: "", role: "", persona_id: "" });
+      closeUserModal();
+      const pageToRefetch = isEdit ? usersPage : 1;
+      if (!isEdit) setUsersPage(1);
+      fetch(`${API_BASE}/api/admin/users?page=${pageToRefetch}&limit=${usersLimit}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.ok ? r.json() : Promise.reject(new Error("Failed to refresh")))
+        .then((d) => {
+          setUsersList(d.users || []);
+          setUsersTotal(d.total ?? 0);
+        })
+        .catch(() => {});
     } catch {
-      setCreateUserError("Failed to create user.");
+      setCreateUserError(isEdit ? "Failed to update user." : "Failed to create user.");
+    } finally {
+      setSavingUser(false);
     }
-  }, [token, userForm]);
+  }, [token, editingUser, userForm, closeUserModal]);
 
   const confirmFactoryReset = useCallback(async () => {
     if (!token) return;
@@ -339,6 +441,15 @@ export default function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [factoryResetConfirmOpen, factoryResetLoading]);
+
+  useEffect(() => {
+    if (!userModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !savingUser) closeUserModal();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [userModalOpen, savingUser, closeUserModal]);
 
   const sendChat = async () => {
     const text = chatInput.trim();
@@ -657,76 +768,85 @@ export default function App() {
             )}
             {adminSubTab === "users" && (
               <div className={styles.userManagement}>
-                <section className={styles.userFormSection}>
-                  <h3 className={styles.userFormTitle}>Create user</h3>
-                  {createUserError && (
-                    <div className={styles.adminError}>{createUserError}</div>
-                  )}
-                  {createUserSuccess && (
-                    <div className={styles.createUserSuccess}>User created successfully.</div>
-                  )}
-                  <div className={styles.userForm}>
-                    <label className={styles.userFormLabel}>
-                      Email
-                      <input
-                        type="email"
-                        className={styles.userFormInput}
-                        value={userForm.email}
-                        onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
-                        placeholder="user@example.com"
-                      />
-                    </label>
-                    <label className={styles.userFormLabel}>
-                      Password
-                      <input
-                        type="password"
-                        className={styles.userFormInput}
-                        value={userForm.password}
-                        onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
-                        placeholder="••••••••"
-                      />
-                    </label>
-                    <label className={styles.userFormLabel}>
-                      Name
-                      <input
-                        type="text"
-                        className={styles.userFormInput}
-                        value={userForm.name}
-                        onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="Display name"
-                      />
-                    </label>
-                    <label className={styles.userFormLabel}>
-                      Role
-                      <input
-                        type="text"
-                        className={styles.userFormInput}
-                        value={userForm.role}
-                        onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value }))}
-                        placeholder="e.g. Engineer, Manager"
-                      />
-                    </label>
-                    <label className={styles.userFormLabel}>
-                      Persona
-                      <select
-                        className={styles.userFormInput}
-                        value={userForm.persona_id}
-                        onChange={(e) => setUserForm((f) => ({ ...f, persona_id: e.target.value }))}
-                      >
-                        <option value="">— None —</option>
-                        {personas.map((p) => (
-                          <option key={p.id} value={String(p.id)}>{p.name}</option>
-                        ))}
-                      </select>
-                    </label>
+                <section className={styles.userListSection}>
+                  <div className={styles.userListHeader}>
+                    <h3 className={styles.userFormTitle}>Users</h3>
                     <button
                       type="button"
-                      className={styles.userFormSubmit}
-                      onClick={createUser}
+                      className={styles.createUserBtn}
+                      onClick={openUserModalCreate}
                     >
-                      Create user
+                      Create new user
                     </button>
                   </div>
+                  {usersError && (
+                    <div className={styles.adminError}>{usersError}</div>
+                  )}
+                  {usersLoading && (
+                    <div className={styles.loading}>Loading users…</div>
+                  )}
+                  {!usersLoading && usersList.length > 0 && (
+                    <>
+                      <div className={styles.userTableWrap}>
+                        <table className={styles.userTable}>
+                          <thead>
+                            <tr>
+                              <th>Email</th>
+                              <th>Name</th>
+                              <th>Role</th>
+                              <th>Persona</th>
+                              <th>Admin</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {usersList.map((u) => (
+                              <tr key={u.id}>
+                                <td>{u.email}</td>
+                                <td>{u.name}</td>
+                                <td>{u.role}</td>
+                                <td>{personas.find((p) => p.id === u.personaId)?.name ?? "—"}</td>
+                                <td>{u.isAdmin ? "Yes" : "—"}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className={styles.userEditBtn}
+                                    onClick={() => openUserModalEdit(u)}
+                                  >
+                                    Edit
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className={styles.userPagination}>
+                        <button
+                          type="button"
+                          className={styles.paginationBtn}
+                          disabled={usersPage <= 1}
+                          onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                        >
+                          Previous
+                        </button>
+                        <span className={styles.paginationInfo}>
+                          Page {usersPage} of {Math.max(1, Math.ceil(usersTotal / usersLimit))} ({usersTotal} total)
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.paginationBtn}
+                          disabled={usersPage >= Math.ceil(usersTotal / usersLimit)}
+                          onClick={() => setUsersPage((p) => p + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {!usersLoading && usersList.length === 0 && !usersError && (
+                    <div className={styles.adminEmpty}>No users yet. Create one to get started.</div>
+                  )}
                 </section>
                 <section className={styles.factoryResetSection}>
                   <h3 className={styles.userFormTitle}>Data factory reset</h3>
@@ -974,6 +1094,102 @@ export default function App() {
                   disabled={factoryResetLoading}
                 >
                   {factoryResetLoading ? "Resetting…" : "Yes, reset everything"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User create/edit modal */}
+        {userModalOpen && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => !savingUser && closeUserModal()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="user-modal-title"
+          >
+            <div
+              className={styles.modalContent}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="user-modal-title" className={styles.modalTitle}>
+                {editingUser ? "Edit user" : "Create user"}
+              </h2>
+              {createUserError && (
+                <div className={styles.adminError}>{createUserError}</div>
+              )}
+              <div className={styles.userForm}>
+                <label className={styles.userFormLabel}>
+                  Email
+                  <input
+                    type="email"
+                    className={styles.userFormInput}
+                    value={userForm.email}
+                    onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="user@example.com"
+                  />
+                </label>
+                <label className={styles.userFormLabel}>
+                  Password
+                  <input
+                    type="password"
+                    className={styles.userFormInput}
+                    value={userForm.password}
+                    onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder={editingUser ? "Leave blank to keep current" : "••••••••"}
+                  />
+                </label>
+                <label className={styles.userFormLabel}>
+                  Name
+                  <input
+                    type="text"
+                    className={styles.userFormInput}
+                    value={userForm.name}
+                    onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Display name"
+                  />
+                </label>
+                <label className={styles.userFormLabel}>
+                  Role
+                  <input
+                    type="text"
+                    className={styles.userFormInput}
+                    value={userForm.role}
+                    onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value }))}
+                    placeholder="e.g. Engineer, Manager"
+                  />
+                </label>
+                <label className={styles.userFormLabel}>
+                  Persona
+                  <select
+                    className={styles.userFormInput}
+                    value={userForm.persona_id}
+                    onChange={(e) => setUserForm((f) => ({ ...f, persona_id: e.target.value }))}
+                  >
+                    <option value="">— None —</option>
+                    {personas.map((p) => (
+                      <option key={p.id} value={String(p.id)}>{p.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalBtnSecondary}
+                  onClick={closeUserModal}
+                  disabled={savingUser}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.modalBtnPrimary}
+                  onClick={saveUser}
+                  disabled={savingUser}
+                >
+                  {savingUser ? "Saving…" : editingUser ? "Save changes" : "Create user"}
                 </button>
               </div>
             </div>

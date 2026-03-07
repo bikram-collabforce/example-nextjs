@@ -241,6 +241,104 @@ fastify.get("/api/admin/personas", async (request, reply) => {
   }
 });
 
+fastify.get<{
+  Querystring: { page?: string; limit?: string };
+}>("/api/admin/users", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const page = Math.max(1, parseInt(request.query.page || "1", 10));
+    const limit = Math.min(50, Math.max(1, parseInt(request.query.limit || "10", 10)));
+    const offset = (page - 1) * limit;
+    const [countRes, usersRes] = await Promise.all([
+      pool.query("SELECT COUNT(*)::int AS total FROM users"),
+      pool.query(
+        `SELECT u.id, u.email, u.name, u.role, u.persona_id AS "personaId", u.is_admin AS "isAdmin"
+         FROM users u ORDER BY u.email LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+    ]);
+    const total = countRes.rows[0]?.total ?? 0;
+    return { users: usersRes.rows, total, page, limit };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
+fastify.patch<{
+  Params: { id: string };
+  Body: { email?: string; password?: string; name?: string; role?: string; persona_id?: number | null };
+}>("/api/admin/users/:id", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const id = parseInt(request.params.id, 10);
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: "Invalid user id." });
+    }
+    const { email, password, name, role, persona_id } = request.body;
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+    if (email !== undefined) {
+      updates.push(`email = $${idx++}`);
+      values.push((email as string).toLowerCase().trim());
+    }
+    if (password !== undefined && (password as string).trim() !== "") {
+      const hashed = await bcrypt.hash((password as string).trim(), 10);
+      updates.push(`password = $${idx++}`);
+      values.push(hashed);
+    }
+    if (name !== undefined) {
+      updates.push(`name = $${idx++}`);
+      values.push((name as string).trim());
+    }
+    if (role !== undefined) {
+      updates.push(`role = $${idx++}`);
+      values.push((role as string).trim() || "User");
+    }
+    if (persona_id !== undefined) {
+      updates.push(`persona_id = $${idx++}`);
+      values.push(persona_id === null ? null : persona_id);
+    }
+    if (updates.length === 0) {
+      return reply.status(400).send({ error: "No fields to update." });
+    }
+    values.push(id);
+    await pool.query(
+      `UPDATE users SET ${updates.join(", ")} WHERE id = $${idx}`,
+      values,
+    );
+    return { ok: true };
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "code" in err && (err as { code: string }).code === "23505"
+      ? "A user with this email already exists."
+      : "Failed to update user.";
+    fastify.log.error(err);
+    return reply.status(500).send({ error: msg });
+  }
+});
+
 fastify.post<{
   Body: { email: string; password: string; name: string; role: string; persona_id?: number };
 }>("/api/admin/users", async (request, reply) => {
