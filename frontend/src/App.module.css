@@ -180,20 +180,27 @@
 }
 
 .logoutBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--body-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--border-radius-sm);
-  padding: 8px 16px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  padding: 8px;
   color: var(--text-primary);
   transition: all 150ms;
+  cursor: pointer;
 }
 
 .logoutBtn:hover {
   background: #fef2f2;
   border-color: #fecaca;
   color: #dc2626;
+}
+
+.logoutIcon {
+  width: 20px;
+  height: 20px;
 }
 
 /* ─── Highlight banner ─── */
@@ -609,6 +616,36 @@
   padding: 0 30px 24px;
 }
 
+.adminSubTabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.adminSubTab,
+.adminSubTabActive {
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.adminSubTab:hover {
+  color: var(--text-primary);
+}
+
+.adminSubTabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 .adminError {
   background: #fef2f2;
   border: 1px solid #fecaca;
@@ -865,6 +902,137 @@
 
 .modalBtnSecondary:hover {
   background: var(--body-bg);
+}
+
+/* ─── User and data management ─── */
+.userManagement {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.userFormSection,
+.factoryResetSection {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius);
+  padding: 24px;
+}
+
+.userFormTitle {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.userForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 400px;
+}
+
+.userFormLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.userFormInput {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-sm);
+  font-family: inherit;
+}
+
+.userFormInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.userFormSubmit {
+  margin-top: 8px;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 150ms;
+}
+
+.userFormSubmit:hover {
+  background: var(--accent-hover);
+}
+
+.createUserSuccess {
+  color: var(--success, #0a7b0a);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.factoryResetSection {
+  border-color: rgba(200, 80, 80, 0.3);
+}
+
+.factoryResetDesc {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  max-width: 560px;
+}
+
+.factoryResetBtn {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--danger, #c53030);
+  background: transparent;
+  color: var(--danger, #c53030);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+
+.factoryResetBtn:hover {
+  background: var(--danger, #c53030);
+  color: #fff;
+}
+
+.factoryResetModalText {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.factoryResetConfirmBtn {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  border: none;
+  background: var(--danger, #c53030);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 150ms;
+}
+
+.factoryResetConfirmBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.factoryResetConfirmBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* ─── Responsive ─── */

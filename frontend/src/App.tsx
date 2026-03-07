@@ -50,6 +50,15 @@ export default function App() {
   const [integrationModal, setIntegrationModal] = useState<Integration | null>(null);
   const [oauthForm, setOauthForm] = useState({ clientId: "", clientSecret: "", redirectUri: "", enabled: false });
   const [savingIntegration, setSavingIntegration] = useState(false);
+  const [adminSubTab, setAdminSubTab] = useState<"integrations" | "users">("integrations");
+  interface PersonaOption { id: number; name: string }
+  const [personas, setPersonas] = useState<PersonaOption[]>([]);
+  const [userForm, setUserForm] = useState({ email: "", password: "", name: "", role: "", persona_id: "" });
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
+  const [createUserSuccess, setCreateUserSuccess] = useState(false);
+  const [factoryResetConfirmOpen, setFactoryResetConfirmOpen] = useState(false);
+  const [factoryResetLoading, setFactoryResetLoading] = useState(false);
+  const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -112,7 +121,7 @@ export default function App() {
   }, [token, activeView]);
 
   useEffect(() => {
-    if (!token || activeView !== "administration") return;
+    if (!token || activeView !== "administration" || adminSubTab !== "integrations") return;
     setIntegrationsError(null);
     setIntegrations(null);
     fetch(`${API_BASE}/api/admin/integrations`, {
@@ -125,7 +134,22 @@ export default function App() {
       })
       .then((d) => setIntegrations(d.integrations || []))
       .catch((e) => setIntegrationsError(e.message || "Failed to load integrations."));
-  }, [token, activeView]);
+  }, [token, activeView, adminSubTab]);
+
+  useEffect(() => {
+    if (!token || activeView !== "administration" || adminSubTab !== "users") return;
+    setFactoryResetError(null);
+    fetch(`${API_BASE}/api/admin/personas`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (r.status === 403) throw new Error("Access denied.");
+        if (!r.ok) throw new Error("Failed to load personas.");
+        return r.json();
+      })
+      .then((d) => setPersonas(d.personas || []))
+      .catch(() => setPersonas([]));
+  }, [token, activeView, adminSubTab]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -212,6 +236,67 @@ export default function App() {
     [token],
   );
 
+  const createUser = useCallback(async () => {
+    if (!token) return;
+    setCreateUserError(null);
+    setCreateUserSuccess(false);
+    if (!userForm.email.trim() || !userForm.password) {
+      setCreateUserError("Email and password are required.");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: userForm.email.trim(),
+          password: userForm.password,
+          name: userForm.name.trim() || undefined,
+          role: userForm.role.trim() || undefined,
+          persona_id: userForm.persona_id ? parseInt(userForm.persona_id, 10) : undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCreateUserError(data.error || "Failed to create user.");
+        return;
+      }
+      setCreateUserSuccess(true);
+      setUserForm({ email: "", password: "", name: "", role: "", persona_id: "" });
+    } catch {
+      setCreateUserError("Failed to create user.");
+    }
+  }, [token, userForm]);
+
+  const confirmFactoryReset = useCallback(async () => {
+    if (!token) return;
+    setFactoryResetError(null);
+    setFactoryResetLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/factory-reset`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Factory reset failed.");
+      }
+      setFactoryResetConfirmOpen(false);
+      handleLogout();
+    } catch (e) {
+      setFactoryResetError(e instanceof Error ? e.message : "Factory reset failed.");
+    } finally {
+      setFactoryResetLoading(false);
+    }
+  }, [token, handleLogout]);
+
   useEffect(() => {
     if (!integrationModal) return;
     const onKey = (e: KeyboardEvent) => {
@@ -220,6 +305,15 @@ export default function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [integrationModal, closeIntegrationModal]);
+
+  useEffect(() => {
+    if (!factoryResetConfirmOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !factoryResetLoading) setFactoryResetConfirmOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [factoryResetConfirmOpen, factoryResetLoading]);
 
   const sendChat = async () => {
     const text = chatInput.trim();
@@ -351,7 +445,9 @@ export default function App() {
               {activeView === "statistics"
                 ? "Table statistics"
                 : activeView === "administration"
-                  ? "Integrations & onboarding"
+                  ? adminSubTab === "users"
+                    ? "User and data management"
+                    : "Integrations & onboarding"
                   : "Your Day at a Glance"}
             </h1>
           </div>
@@ -365,8 +461,18 @@ export default function App() {
               <span className={styles.userName}>{user.name}</span>
               <span className={styles.userRole}>{user.role}</span>
             </div>
-            <button className={styles.logoutBtn} onClick={handleLogout}>
-              Sign Out
+            <button
+              type="button"
+              className={styles.logoutBtn}
+              onClick={handleLogout}
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <svg className={styles.logoutIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
             </button>
           </div>
         </div>
@@ -408,6 +514,24 @@ export default function App() {
           </div>
         ) : activeView === "administration" ? (
           <div className={styles.adminContent}>
+            <div className={styles.adminSubTabs}>
+              <button
+                type="button"
+                className={adminSubTab === "integrations" ? styles.adminSubTabActive : styles.adminSubTab}
+                onClick={() => setAdminSubTab("integrations")}
+              >
+                Integrations
+              </button>
+              <button
+                type="button"
+                className={adminSubTab === "users" ? styles.adminSubTabActive : styles.adminSubTab}
+                onClick={() => setAdminSubTab("users")}
+              >
+                User and data management
+              </button>
+            </div>
+            {adminSubTab === "integrations" && (
+              <>
             {integrationsError && (
               <div className={styles.adminError}>{integrationsError}</div>
             )}
@@ -467,6 +591,99 @@ export default function App() {
             )}
             {integrations && integrations.length === 0 && !integrationsError && (
               <div className={styles.adminEmpty}>No integrations configured.</div>
+            )}
+              </>
+            )}
+            {adminSubTab === "users" && (
+              <div className={styles.userManagement}>
+                <section className={styles.userFormSection}>
+                  <h3 className={styles.userFormTitle}>Create user</h3>
+                  {createUserError && (
+                    <div className={styles.adminError}>{createUserError}</div>
+                  )}
+                  {createUserSuccess && (
+                    <div className={styles.createUserSuccess}>User created successfully.</div>
+                  )}
+                  <div className={styles.userForm}>
+                    <label className={styles.userFormLabel}>
+                      Email
+                      <input
+                        type="email"
+                        className={styles.userFormInput}
+                        value={userForm.email}
+                        onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
+                        placeholder="user@example.com"
+                      />
+                    </label>
+                    <label className={styles.userFormLabel}>
+                      Password
+                      <input
+                        type="password"
+                        className={styles.userFormInput}
+                        value={userForm.password}
+                        onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder="••••••••"
+                      />
+                    </label>
+                    <label className={styles.userFormLabel}>
+                      Name
+                      <input
+                        type="text"
+                        className={styles.userFormInput}
+                        value={userForm.name}
+                        onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Display name"
+                      />
+                    </label>
+                    <label className={styles.userFormLabel}>
+                      Role
+                      <input
+                        type="text"
+                        className={styles.userFormInput}
+                        value={userForm.role}
+                        onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value }))}
+                        placeholder="e.g. Engineer, Manager"
+                      />
+                    </label>
+                    <label className={styles.userFormLabel}>
+                      Persona
+                      <select
+                        className={styles.userFormInput}
+                        value={userForm.persona_id}
+                        onChange={(e) => setUserForm((f) => ({ ...f, persona_id: e.target.value }))}
+                      >
+                        <option value="">— None —</option>
+                        {personas.map((p) => (
+                          <option key={p.id} value={String(p.id)}>{p.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className={styles.userFormSubmit}
+                      onClick={createUser}
+                    >
+                      Create user
+                    </button>
+                  </div>
+                </section>
+                <section className={styles.factoryResetSection}>
+                  <h3 className={styles.userFormTitle}>Data factory reset</h3>
+                  <p className={styles.factoryResetDesc}>
+                    Drop all tables, recreate the schema, and reseed with default data. You will be signed out. Use only when you need a clean slate.
+                  </p>
+                  {factoryResetError && (
+                    <div className={styles.adminError}>{factoryResetError}</div>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.factoryResetBtn}
+                    onClick={() => setFactoryResetConfirmOpen(true)}
+                  >
+                    Factory reset (drop &amp; reseed)
+                  </button>
+                </section>
+              </div>
             )}
           </div>
         ) : (
@@ -644,6 +861,50 @@ export default function App() {
           </div>
         </div>
           </>
+        )}
+
+        {/* Factory reset confirmation modal */}
+        {factoryResetConfirmOpen && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => !factoryResetLoading && setFactoryResetConfirmOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="factory-reset-modal-title"
+          >
+            <div
+              className={styles.modalContent}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="factory-reset-modal-title" className={styles.modalTitle}>
+                Confirm factory reset
+              </h2>
+              <p className={styles.factoryResetModalText}>
+                This will <strong>delete all data</strong>, drop every table, recreate the schema, and reseed with default users and demo data. You will be signed out. This cannot be undone.
+              </p>
+              <p className={styles.factoryResetModalText}>
+                Are you sure you want to continue?
+              </p>
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalBtnSecondary}
+                  onClick={() => !factoryResetLoading && setFactoryResetConfirmOpen(false)}
+                  disabled={factoryResetLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.factoryResetConfirmBtn}
+                  onClick={confirmFactoryReset}
+                  disabled={factoryResetLoading}
+                >
+                  {factoryResetLoading ? "Resetting…" : "Yes, reset everything"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* OAuth edit modal */}

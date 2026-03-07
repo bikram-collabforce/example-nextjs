@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { pool, initDb } from "./db";
+import { pool, initDb, factoryReset } from "./db";
 
 const JWT_SECRET = "digital-twin-secret-key-2024";
 
@@ -218,6 +218,92 @@ fastify.patch<{
   }
 });
 
+fastify.get("/api/admin/personas", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const { rows } = await pool.query(
+      'SELECT id, name FROM persona ORDER BY name',
+    );
+    return { personas: rows };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
+fastify.post<{
+  Body: { email: string; password: string; name: string; role: string; persona_id?: number };
+}>("/api/admin/users", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const { email, password, name, role, persona_id } = request.body;
+    if (!email?.trim() || !password) {
+      return reply.status(400).send({ error: "Email and password are required." });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    await pool.query(
+      `INSERT INTO users (email, password, name, role, persona_id, is_admin)
+       VALUES ($1, $2, $3, COALESCE(NULLIF($4, ''), 'User'), $5, FALSE)`,
+      [email.toLowerCase().trim(), hashed, (name || email).trim(), role ?? "User", persona_id ?? null],
+    );
+    return { ok: true };
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "code" in err && (err as { code: string }).code === "23505"
+      ? "A user with this email already exists."
+      : "Failed to create user.";
+    fastify.log.error(err);
+    return reply.status(500).send({ error: msg });
+  }
+});
+
+fastify.post<{
+  Body: { confirm: boolean };
+}>("/api/admin/factory-reset", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    if (request.body?.confirm !== true) {
+      return reply.status(400).send({ error: "Confirmation required. Send { confirm: true }." });
+    }
+    await factoryReset();
+    return { ok: true };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: "Factory reset failed." });
+  }
+});
+
 function getTimeSlot(): string {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return "morning";
@@ -228,48 +314,39 @@ function getTimeSlot(): string {
 
 fastify.get("/api/dashboard", async (request, reply) => {
   const auth = request.headers.authorization;
-  let personaId: number | null = null;
-
-  if (auth?.startsWith("Bearer ")) {
-    try {
-      const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
-      const { rows } = await pool.query(
-        "SELECT persona_id FROM users WHERE id = $1",
-        [payload.id],
-      );
-      if (rows.length > 0) personaId = rows[0].persona_id;
-    } catch {
-      /* fall through to default */
-    }
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
   }
-
-  if (!personaId) {
-    const { rows } = await pool.query("SELECT id FROM personas WHERE name = 'Engineer'");
-    personaId = rows[0]?.id ?? 1;
+  let userId: number;
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    userId = payload.id;
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
   }
 
   const slot = getTimeSlot();
 
   const [highlights, meetings, followUps, events, pending] = await Promise.all([
     pool.query(
-      "SELECT label, text FROM highlights WHERE persona_id = $1 AND time_slot = $2 LIMIT 1",
-      [personaId, slot],
+      "SELECT label, text FROM highlights WHERE user_id = $1 AND time_slot = $2 LIMIT 1",
+      [userId, slot],
     ),
     pool.query(
-      "SELECT id, title, summary FROM meeting_summaries WHERE persona_id = $1 AND time_slot = $2 ORDER BY id",
-      [personaId, slot],
+      "SELECT id, title, summary FROM meeting_summaries WHERE user_id = $1 AND time_slot = $2 ORDER BY id",
+      [userId, slot],
     ),
     pool.query(
-      "SELECT id, text, done FROM follow_ups WHERE persona_id = $1 AND time_slot = $2 ORDER BY id",
-      [personaId, slot],
+      "SELECT id, text, done FROM follow_ups WHERE user_id = $1 AND time_slot = $2 ORDER BY id",
+      [userId, slot],
     ),
     pool.query(
-      "SELECT id, time, title, tag, description, actions FROM schedule_events WHERE persona_id = $1 AND time_slot = $2 ORDER BY id",
-      [personaId, slot],
+      "SELECT id, time, title, tag, description, actions FROM schedule_events WHERE user_id = $1 AND time_slot = $2 ORDER BY id",
+      [userId, slot],
     ),
     pool.query(
-      "SELECT id, title, badge, description, actions FROM pending_items WHERE persona_id = $1 AND time_slot = $2 ORDER BY id",
-      [personaId, slot],
+      "SELECT id, title, badge, description, actions FROM pending_items WHERE user_id = $1 AND time_slot = $2 ORDER BY id",
+      [userId, slot],
     ),
   ]);
 
