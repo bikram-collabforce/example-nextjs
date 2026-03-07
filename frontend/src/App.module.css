@@ -676,6 +676,197 @@
   padding: 24px;
 }
 
+/* ─── Integrations (Administration) ─── */
+.integrationGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.integrationGroup {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.integrationGroupTitle {
+  margin: 0;
+  padding: 14px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--body-bg);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.integrationList {
+  padding: 8px 0;
+}
+
+.integrationRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  gap: 16px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.integrationRow:last-child {
+  border-bottom: none;
+}
+
+.integrationName {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.integrationActions {
+  display: flex;
+  gap: 10px;
+}
+
+.integrationBtn {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.integrationBtn:hover:not(:disabled) {
+  background: var(--accent-light);
+  border-color: var(--accent);
+}
+
+.integrationBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── OAuth modal ─── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  max-width: 440px;
+  width: 100%;
+  padding: 24px;
+}
+
+.modalTitle {
+  margin: 0 0 20px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.oauthForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.oauthLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.oauthInput {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-sm);
+  font-family: inherit;
+}
+
+.oauthInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.oauthCheckboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.oauthCheckboxLabel input {
+  width: 18px;
+  height: 18px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.modalBtnPrimary {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.modalBtnPrimary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.modalBtnPrimary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.modalBtnSecondary {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.modalBtnSecondary:hover {
+  background: var(--body-bg);
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 960px) {
   .sidebar { display: none; }

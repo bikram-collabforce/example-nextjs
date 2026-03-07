@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { DashboardData, ChatMessage } from "./types";
+import type { DashboardData, ChatMessage, Integration } from "./types";
 import Login from "./Login";
 import styles from "./App.module.css";
 
@@ -41,10 +41,15 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [activeView, setActiveView] = useState<"dashboard" | "admin">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "statistics" | "administration">("dashboard");
   const [data, setData] = useState<DashboardData | null>(null);
   const [adminStats, setAdminStats] = useState<AdminTableStat[] | null>(null);
   const [adminStatsError, setAdminStatsError] = useState<string | null>(null);
+  const [integrations, setIntegrations] = useState<Integration[] | null>(null);
+  const [integrationsError, setIntegrationsError] = useState<string | null>(null);
+  const [integrationModal, setIntegrationModal] = useState<Integration | null>(null);
+  const [oauthForm, setOauthForm] = useState({ clientId: "", clientSecret: "", redirectUri: "", enabled: false });
+  const [savingIntegration, setSavingIntegration] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -91,7 +96,7 @@ export default function App() {
   }, [token]);
 
   useEffect(() => {
-    if (!token || activeView !== "admin") return;
+    if (!token || activeView !== "statistics") return;
     setAdminStatsError(null);
     setAdminStats(null);
     fetch(`${API_BASE}/api/admin/stats`, {
@@ -107,8 +112,114 @@ export default function App() {
   }, [token, activeView]);
 
   useEffect(() => {
+    if (!token || activeView !== "administration") return;
+    setIntegrationsError(null);
+    setIntegrations(null);
+    fetch(`${API_BASE}/api/admin/integrations`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (r.status === 403) throw new Error("Access denied.");
+        if (!r.ok) throw new Error("Failed to load integrations.");
+        return r.json();
+      })
+      .then((d) => setIntegrations(d.integrations || []))
+      .catch((e) => setIntegrationsError(e.message || "Failed to load integrations."));
+  }, [token, activeView]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
+
+  const openIntegrationEdit = useCallback((integration: Integration) => {
+    setIntegrationModal(integration);
+    setOauthForm({
+      clientId: integration.clientId ?? "",
+      clientSecret: "",
+      redirectUri: integration.redirectUri ?? "",
+      enabled: integration.enabled,
+    });
+  }, []);
+
+  const closeIntegrationModal = useCallback(() => {
+    setIntegrationModal(null);
+    setOauthForm({ clientId: "", clientSecret: "", redirectUri: "", enabled: false });
+  }, []);
+
+  const saveIntegration = useCallback(async () => {
+    if (!token || !integrationModal) return;
+    setSavingIntegration(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/integrations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          serviceKey: integrationModal.serviceKey,
+          displayName: integrationModal.displayName,
+          groupName: integrationModal.groupName,
+          clientId: oauthForm.clientId || undefined,
+          clientSecret: oauthForm.clientSecret || undefined,
+          redirectUri: oauthForm.redirectUri || undefined,
+          enabled: oauthForm.enabled,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      closeIntegrationModal();
+      const listRes = await fetch(`${API_BASE}/api/admin/integrations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        setIntegrations(listData.integrations || []);
+      }
+    } catch {
+      setIntegrationsError("Failed to save integration.");
+    } finally {
+      setSavingIntegration(false);
+    }
+  }, [token, integrationModal, oauthForm, closeIntegrationModal]);
+
+  const toggleIntegrationEnabled = useCallback(
+    async (integration: Integration) => {
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/integrations/enable`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            serviceKey: integration.serviceKey,
+            enabled: !integration.enabled,
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to update");
+        setIntegrations((prev) =>
+          prev
+            ? prev.map((i) =>
+                i.serviceKey === integration.serviceKey ? { ...i, enabled: !i.enabled } : i,
+              )
+            : prev,
+        );
+      } catch {
+        setIntegrationsError("Failed to update enable state.");
+      }
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    if (!integrationModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeIntegrationModal();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [integrationModal, closeIntegrationModal]);
 
   const sendChat = async () => {
     const text = chatInput.trim();
@@ -194,11 +305,18 @@ export default function App() {
         {user?.isAdmin && (
           <>
             <hr className={styles.sidebarDivider} />
-            <div className={styles.sidebarSection}>Administration</div>
+            <div className={styles.sidebarSection}>Admin</div>
             <button
               type="button"
-              className={activeView === "admin" ? styles.navItemActive : styles.navItem}
-              onClick={() => setActiveView("admin")}
+              className={activeView === "statistics" ? styles.navItemActive : styles.navItem}
+              onClick={() => setActiveView("statistics")}
+            >
+              <span className={styles.navIcon}>📈</span> Statistics
+            </button>
+            <button
+              type="button"
+              className={activeView === "administration" ? styles.navItemActive : styles.navItem}
+              onClick={() => setActiveView("administration")}
             >
               <span className={styles.navIcon}>⚙️</span> Administration
             </button>
@@ -220,10 +338,21 @@ export default function App() {
         <div className={styles.topBar}>
           <div>
             <div className={styles.breadcrumb}>
-              Pages / <span>{activeView === "admin" ? "Administration" : "Dashboard"}</span>
+              Pages /{" "}
+              <span>
+                {activeView === "statistics"
+                  ? "Statistics"
+                  : activeView === "administration"
+                    ? "Administration"
+                    : "Dashboard"}
+              </span>
             </div>
             <h1 className={styles.pageTitle}>
-              {activeView === "admin" ? "Table statistics" : "Your Day at a Glance"}
+              {activeView === "statistics"
+                ? "Table statistics"
+                : activeView === "administration"
+                  ? "Integrations & onboarding"
+                  : "Your Day at a Glance"}
             </h1>
           </div>
           <div className={styles.userMenu}>
@@ -242,7 +371,7 @@ export default function App() {
           </div>
         </div>
 
-        {activeView === "admin" ? (
+        {activeView === "statistics" ? (
           <div className={styles.adminContent}>
             {adminStatsError && (
               <div className={styles.adminError}>{adminStatsError}</div>
@@ -275,6 +404,69 @@ export default function App() {
             )}
             {adminStats && adminStats.length === 0 && !adminStatsError && (
               <div className={styles.adminEmpty}>No stats for today yet.</div>
+            )}
+          </div>
+        ) : activeView === "administration" ? (
+          <div className={styles.adminContent}>
+            {integrationsError && (
+              <div className={styles.adminError}>{integrationsError}</div>
+            )}
+            {integrations === null && !integrationsError && (
+              <div className={styles.loading}>Loading integrations…</div>
+            )}
+            {integrations && integrations.length > 0 && (
+              <div className={styles.integrationGroups}>
+                {Array.from(
+                  new Set(integrations.map((i) => i.groupName)),
+                ).map((groupName) => (
+                  <div key={groupName} className={styles.integrationGroup}>
+                    <h3 className={styles.integrationGroupTitle}>{groupName}</h3>
+                    <div className={styles.integrationList}>
+                      {integrations
+                        .filter((i) => i.groupName === groupName)
+                        .map((int) => (
+                          <div
+                            key={int.serviceKey}
+                            className={styles.integrationRow}
+                          >
+                            <span className={styles.integrationName}>
+                              {int.displayName}
+                            </span>
+                            <div className={styles.integrationActions}>
+                              <button
+                                type="button"
+                                className={styles.integrationBtn}
+                                onClick={() => openIntegrationEdit(int)}
+                                disabled={int.enabled}
+                                title={int.enabled ? "Disable the integration first to edit" : "Edit OAuth settings"}
+                              >
+                                {int.hasCredentials ? "Edit" : "Add"}
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.integrationBtn}
+                                onClick={() => toggleIntegrationEnabled(int)}
+                                disabled={!int.hasCredentials}
+                                title={
+                                  !int.hasCredentials
+                                    ? "Configure OAuth first"
+                                    : int.enabled
+                                      ? "Disable"
+                                      : "Enable"
+                                }
+                              >
+                                {int.enabled ? "Disable" : "Enable"}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {integrations && integrations.length === 0 && !integrationsError && (
+              <div className={styles.adminEmpty}>No integrations configured.</div>
             )}
           </div>
         ) : (
@@ -454,6 +646,90 @@ export default function App() {
           </>
         )}
 
+        {/* OAuth edit modal */}
+        {integrationModal && (
+          <div
+            className={styles.modalOverlay}
+            onClick={closeIntegrationModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="oauth-modal-title"
+          >
+            <div
+              className={styles.modalContent}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="oauth-modal-title" className={styles.modalTitle}>
+                OAuth — {integrationModal.displayName}
+              </h2>
+              <div className={styles.oauthForm}>
+                <label className={styles.oauthLabel}>
+                  Client ID
+                  <input
+                    type="text"
+                    className={styles.oauthInput}
+                    value={oauthForm.clientId}
+                    onChange={(e) =>
+                      setOauthForm((f) => ({ ...f, clientId: e.target.value }))
+                    }
+                    placeholder="OAuth client ID"
+                  />
+                </label>
+                <label className={styles.oauthLabel}>
+                  Client Secret
+                  <input
+                    type="password"
+                    className={styles.oauthInput}
+                    value={oauthForm.clientSecret}
+                    onChange={(e) =>
+                      setOauthForm((f) => ({ ...f, clientSecret: e.target.value }))
+                    }
+                    placeholder="Leave blank to keep existing"
+                  />
+                </label>
+                <label className={styles.oauthLabel}>
+                  Redirect URI
+                  <input
+                    type="text"
+                    className={styles.oauthInput}
+                    value={oauthForm.redirectUri}
+                    onChange={(e) =>
+                      setOauthForm((f) => ({ ...f, redirectUri: e.target.value }))
+                    }
+                    placeholder="https://..."
+                  />
+                </label>
+                <label className={styles.oauthCheckboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={oauthForm.enabled}
+                    onChange={(e) =>
+                      setOauthForm((f) => ({ ...f, enabled: e.target.checked }))
+                    }
+                  />
+                  Enable integration
+                </label>
+              </div>
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalBtnSecondary}
+                  onClick={closeIntegrationModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.modalBtnPrimary}
+                  onClick={saveIntegration}
+                  disabled={savingIntegration}
+                >
+                  {savingIntegration ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

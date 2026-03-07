@@ -51,3 +51,13 @@ export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
 }
+
+export interface Integration {
+  serviceKey: string;
+  displayName: string;
+  groupName: string;
+  enabled: boolean;
+  clientId: string | null;
+  redirectUri: string | null;
+  hasCredentials: boolean;
+}

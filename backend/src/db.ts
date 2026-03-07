@@ -10,19 +10,6 @@ export const pool = new Pool({
 });
 
 export async function initDb() {
-  const { rows: personaCol } = await pool.query(`
-    SELECT column_name FROM information_schema.columns
-    WHERE table_name = 'users' AND column_name = 'persona_id'
-  `);
-  const { rows: adminCol } = await pool.query(`
-    SELECT column_name FROM information_schema.columns
-    WHERE table_name = 'users' AND column_name = 'is_admin'
-  `);
-  if (personaCol.length === 0 || adminCol.length === 0) {
-    await pool.query("DROP TABLE IF EXISTS daily_table_stats, pending_items, schedule_events, follow_ups, meeting_summaries, highlights, users, personas CASCADE");
-    console.log("Dropped old tables for schema migration.");
-  }
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS personas (
       id SERIAL PRIMARY KEY,
@@ -111,6 +98,30 @@ export async function initDb() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS integrations (
+      id SERIAL PRIMARY KEY,
+      service_key VARCHAR(80) UNIQUE NOT NULL,
+      display_name VARCHAR(120) NOT NULL,
+      group_name VARCHAR(80) NOT NULL,
+      enabled BOOLEAN DEFAULT FALSE,
+      client_id VARCHAR(512),
+      client_secret TEXT,
+      redirect_uri VARCHAR(512),
+      access_token TEXT,
+      refresh_token TEXT,
+      token_expires_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  // Non-destructive migrations: add columns if missing (e.g. existing DB from older schema). Never drop tables.
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS persona_id INTEGER REFERENCES personas(id)");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE");
+
+  await seedIntegrationTypes();
+
   const { rows: personaCheck } = await pool.query("SELECT COUNT(*) FROM personas");
   if (parseInt(personaCheck[0].count, 10) > 0) {
     const { rows: adminCheck } = await pool.query("SELECT id FROM users WHERE is_admin = TRUE LIMIT 1");
@@ -138,6 +149,18 @@ export async function initDb() {
           "INSERT INTO daily_table_stats (table_name, stat_date, processed_count, failed_count, failed_reason) VALUES ($1, $2, $3, $4, $5)",
           [tname, today, processed, failed, reason],
         );
+      }
+    }
+    // If dashboard tables are empty (e.g. after a prior destructive migration), re-seed dashboard data only.
+    console.log("Checking if Seeding dashboard data needed (highlights, meetings, follow-ups, schedule, pending).");
+    const { rows: highlightsCheck } = await pool.query("SELECT COUNT(*) FROM highlights");
+    if (parseInt(highlightsCheck[0].count, 10) === 0) {
+      const { rows: personaRows } = await pool.query("SELECT id, name FROM personas");
+      const personaMap: Record<string, number> = {};
+      for (const r of personaRows) personaMap[r.name] = r.id;
+      if (Object.keys(personaMap).length >= 5) {
+        await seedDashboardData(personaMap);
+        console.log("Seeded dashboard data (highlights, meetings, follow-ups, schedule, pending).");
       }
     }
     return;
@@ -202,6 +225,11 @@ async function seedAll() {
     );
   }
 
+  await seedDashboardData(personaMap);
+  console.log("Seeded all personas, users, and dashboard data.");
+}
+
+async function seedDashboardData(personaMap: Record<string, number>) {
   // ── ENGINEER ──
   const eng = personaMap["Engineer"];
 
@@ -427,8 +455,36 @@ async function seedAll() {
     ["evening", "Org Metrics Review", null, "Monthly cross-system report ready. NPS drop needs attention.", ["View report", "Discuss"]],
     ["night", "Reorg Proposal", null, "Deferred from leadership meeting. HR analysis expected by Wednesday.", ["View proposal", "Follow up"]],
   ]);
+}
 
-  console.log("Seeded all personas, users, and dashboard data.");
+async function seedIntegrationTypes() {
+  const services: [string, string, string][] = [
+    ["slack", "Slack Connect", "Messaging & Email"],
+    ["gmail", "Gmail", "Messaging & Email"],
+    ["outlook", "Outlook", "Messaging & Email"],
+    ["teams", "Teams", "Messaging & Email"],
+    ["voice_phone", "Voice / Phone", "Voice & Social"],
+    ["whatsapp", "WhatsApp", "Voice & Social"],
+    ["telegram", "Telegram", "Voice & Social"],
+    ["instagram", "Instagram", "Voice & Social"],
+    ["gus", "GUS", "Productivity & Dev"],
+    ["jira", "Jira", "Productivity & Dev"],
+    ["github", "GitHub", "Productivity & Dev"],
+    ["calendar", "Calendar", "Productivity & Dev"],
+    ["m365", "M365", "Productivity & Dev"],
+    ["salesforce", "Salesforce", "Enterprise"],
+    ["sap", "SAP", "Enterprise"],
+    ["workday", "WorkDay", "Enterprise"],
+    ["devops_tools", "DevOps Tools", "DevOps"],
+  ];
+  for (const [key, name, group] of services) {
+    await pool.query(
+      `INSERT INTO integrations (service_key, display_name, group_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (service_key) DO NOTHING`,
+      [key, name, group],
+    );
+  }
 }
 
 // ── Helper seed functions ──

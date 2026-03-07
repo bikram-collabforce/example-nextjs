@@ -110,6 +110,114 @@ fastify.get("/api/admin/stats", async (request, reply) => {
   }
 });
 
+fastify.get("/api/admin/integrations", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const { rows } = await pool.query(
+      `SELECT service_key AS "serviceKey", display_name AS "displayName", group_name AS "groupName",
+              enabled, client_id AS "clientId", redirect_uri AS "redirectUri",
+              CASE WHEN client_id IS NOT NULL AND client_id != '' THEN true ELSE false END AS "hasCredentials"
+       FROM integrations ORDER BY group_name, display_name`,
+    );
+    return { integrations: rows };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
+fastify.post<{
+  Body: {
+    serviceKey: string;
+    displayName?: string;
+    groupName?: string;
+    clientId?: string;
+    clientSecret?: string;
+    redirectUri?: string;
+    enabled?: boolean;
+  };
+}>("/api/admin/integrations", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const { serviceKey, displayName, groupName, clientId, clientSecret, redirectUri, enabled } = request.body;
+    if (!serviceKey) {
+      return reply.status(400).send({ error: "serviceKey is required." });
+    }
+    const sk = String(serviceKey);
+    await pool.query(
+      `INSERT INTO integrations (service_key, display_name, group_name, enabled, client_id, client_secret, redirect_uri, updated_at)
+       VALUES ($1::varchar, COALESCE(NULLIF($2, ''), $1)::varchar, COALESCE(NULLIF($3, ''), 'Other')::varchar, $4::boolean, $5, $6, $7, NOW())
+       ON CONFLICT (service_key) DO UPDATE SET
+         enabled = COALESCE($4::boolean, integrations.enabled),
+         client_id = COALESCE(NULLIF($5, ''), integrations.client_id),
+         client_secret = CASE WHEN $6 IS NOT NULL AND $6 != '' THEN $6 ELSE integrations.client_secret END,
+         redirect_uri = COALESCE(NULLIF($7, ''), integrations.redirect_uri),
+         updated_at = NOW()`,
+      [sk, displayName ?? null, groupName ?? null, enabled ?? false, clientId ?? null, clientSecret ?? null, redirectUri ?? null],
+    );
+    const { rows } = await pool.query(
+      `SELECT service_key AS "serviceKey", display_name AS "displayName", group_name AS "groupName", enabled
+       FROM integrations WHERE service_key = $1::varchar`,
+      [sk],
+    );
+    return { integration: rows[0] };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: "Failed to save integration." });
+  }
+});
+
+fastify.patch<{
+  Body: { serviceKey: string; enabled: boolean };
+}>("/api/admin/integrations/enable", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const { serviceKey, enabled } = request.body;
+    if (!serviceKey) {
+      return reply.status(400).send({ error: "serviceKey is required." });
+    }
+    await pool.query(
+      "UPDATE integrations SET enabled = $2, updated_at = NOW() WHERE service_key = $1",
+      [serviceKey, !!enabled],
+    );
+    return { ok: true };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
 function getTimeSlot(): string {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return "morning";
