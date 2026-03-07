@@ -62,7 +62,9 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`${API_BASE}/api/dashboard`)
+    fetch(`${API_BASE}/api/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((r) => r.json())
       .then(setData)
       .catch(console.error);
@@ -243,7 +245,7 @@ export default function App() {
               <span className={`${styles.columnIcon} ${styles.iconMeetings}`}>
                 📋
               </span>
-              Meeting Summaries
+              Yesterday's Digest
             </div>
             {data.meetingSummaries.map((m) => (
               <div key={m.id} className={styles.meetingCard}>

@@ -187,9 +187,9 @@
 .highlight {
   margin: 0 30px 20px;
   padding: 16px 22px;
-  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  background: linear-gradient(135deg, #f6d365, #fda085);
   border-radius: var(--border-radius);
-  color: #fff;
+  color: #1b2559;
   font-size: 0.9rem;
   line-height: 1.6;
 }
