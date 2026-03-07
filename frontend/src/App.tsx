@@ -62,7 +62,32 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [chatHistory] = useState<{ id: string; title: string }[]>([
+    { id: "current", title: "Current chat" },
+    { id: "1", title: "Budget & Q4 review" },
+    { id: "2", title: "Meeting schedule" },
+    { id: "3", title: "Project Alpha" },
+    { id: "4", title: "Expense reports" },
+    { id: "5", title: "Timesheet sign-off" },
+    { id: "6", title: "Vendor API access" },
+    { id: "7", title: "Design handoff" },
+    { id: "8", title: "Team standup notes" },
+    { id: "9", title: "1:1 with Sarah" },
+    { id: "10", title: "Pending approvals" },
+    { id: "11", title: "Sprint planning" },
+    { id: "12", title: "Release checklist" },
+    { id: "13", title: "Customer feedback" },
+    { id: "14", title: "HR policies" },
+    { id: "15", title: "IT support ticket" },
+  ]);
+  const [activeChatId, setActiveChatId] = useState<string>("current");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const navTo = useCallback((view: "dashboard" | "statistics" | "administration") => {
+    setActiveView(view);
+    setMobileMenuOpen(false);
+  }, []);
 
   const handleLogin = useCallback((newToken: string, newUser: AuthUser) => {
     setToken(newToken);
@@ -363,8 +388,18 @@ export default function App() {
 
   return (
     <div className={styles.layout}>
+      {/* Mobile menu backdrop */}
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className={styles.sidebarBackdrop}
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close menu"
+        />
+      )}
+
       {/* ─── Sidebar ─── */}
-      <aside className={styles.sidebar}>
+      <aside className={`${styles.sidebar} ${mobileMenuOpen ? styles.sidebarOpen : ""}`}>
         <div className={styles.logo}>
           <span className={styles.logoIcon}>⚡</span>
           Digital Twin
@@ -374,27 +409,16 @@ export default function App() {
         <button
           type="button"
           className={activeView === "dashboard" ? styles.navItemActive : styles.navItem}
-          onClick={() => setActiveView("dashboard")}
+          onClick={() => navTo("dashboard")}
         >
           <span className={styles.navIcon}>📊</span> Dashboard
         </button>
-        <a className={styles.navItem} href="#">
-          <span className={styles.navIcon}>💬</span> Chat
-        </a>
-        <a className={styles.navItem} href="#">
-          <span className={styles.navIcon}>📅</span> Calendar
-        </a>
-
-        <div className={styles.sidebarSection}>Tools</div>
-        <a className={styles.navItem} href="#">
+        <button type="button" className={styles.navItem}>
           <span className={styles.navIcon}>📝</span> Notes
-        </a>
-        <a className={styles.navItem} href="#">
+        </button>
+        <button type="button" className={styles.navItem}>
           <span className={styles.navIcon}>📁</span> Files
-        </a>
-        <a className={styles.navItem} href="#">
-          <span className={styles.navIcon}>⚙️</span> Settings
-        </a>
+        </button>
 
         {user?.isAdmin && (
           <>
@@ -403,19 +427,40 @@ export default function App() {
             <button
               type="button"
               className={activeView === "statistics" ? styles.navItemActive : styles.navItem}
-              onClick={() => setActiveView("statistics")}
+              onClick={() => navTo("statistics")}
             >
               <span className={styles.navIcon}>📈</span> Statistics
             </button>
             <button
               type="button"
               className={activeView === "administration" ? styles.navItemActive : styles.navItem}
-              onClick={() => setActiveView("administration")}
+              onClick={() => navTo("administration")}
             >
               <span className={styles.navIcon}>⚙️</span> Administration
             </button>
           </>
         )}
+
+        <hr className={styles.sidebarDivider} />
+
+        <div className={styles.sidebarChatSection}>
+          <div className={styles.sidebarSection}>Chat</div>
+          <button type="button" className={styles.navItem} aria-expanded="true">
+            <span className={styles.navIcon}>💬</span> Chats
+          </button>
+          <nav className={styles.chatHistoryNav} aria-label="Chat history">
+            {chatHistory.map((chat) => (
+              <button
+                key={chat.id}
+                type="button"
+                className={activeChatId === chat.id ? styles.navSubItemActive : styles.navSubItem}
+                onClick={() => setActiveChatId(chat.id)}
+              >
+                {chat.title}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         <hr className={styles.sidebarDivider} />
 
@@ -430,7 +475,18 @@ export default function App() {
       <main className={styles.main}>
         {/* Top bar */}
         <div className={styles.topBar}>
-          <div>
+          <button
+            type="button"
+            className={styles.hamburgerBtn}
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            <span className={styles.hamburgerLine} />
+            <span className={styles.hamburgerLine} />
+            <span className={styles.hamburgerLine} />
+          </button>
+          <div className={styles.topBarTitleWrap}>
             <div className={styles.breadcrumb}>
               Pages /{" "}
               <span>
@@ -451,7 +507,19 @@ export default function App() {
                   : "Your Day at a Glance"}
             </h1>
           </div>
-          <div className={styles.userMenu}>
+          <div className={styles.topBarRight}>
+            <button
+              type="button"
+              className={styles.settingsBtn}
+              title="Settings"
+              aria-label="Settings"
+            >
+              <svg className={styles.settingsIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            <div className={styles.userMenu}>
             <img
               className={styles.userAvatar}
               src={USER_PHOTOS[user.email] || `https://randomuser.me/api/portraits/men/1.jpg`}
@@ -474,6 +542,7 @@ export default function App() {
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
             </button>
+            </div>
           </div>
         </div>
 
