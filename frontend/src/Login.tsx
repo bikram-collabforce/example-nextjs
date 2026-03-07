@@ -6,12 +6,13 @@ const DEMO_EMAILS = [
   "manager@collabforce.com",
   "pm@collabforce.com",
   "leadership@collabforce.com",
+  "admin@collabforce.com",
 ];
 const DEMO_PASSWORD = "Abcd@1234";
 
 interface LoginProps {
   apiBase: string;
-  onLogin: (token: string, user: { name: string; email: string; role: string }) => void;
+  onLogin: (token: string, user: { name: string; email: string; role: string; isAdmin?: boolean }) => void;
 }
 
 export default function Login({ apiBase, onLogin }: LoginProps) {

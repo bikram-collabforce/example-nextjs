@@ -64,10 +64,15 @@
   border-radius: var(--border-radius-sm);
   font-size: 0.9rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.85);
   transition: all 150ms;
   cursor: pointer;
   text-decoration: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
 }
 
 .navItem:hover {
@@ -597,6 +602,78 @@
   height: 100vh;
   font-size: 1.05rem;
   color: var(--text-secondary);
+}
+
+/* ─── Admin dashboard ─── */
+.adminContent {
+  padding: 0 30px 24px;
+}
+
+.adminError {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
+.adminGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.adminCard {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-border);
+  padding: 20px;
+}
+
+.adminCardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+  text-transform: lowercase;
+}
+
+.adminCardTitle::first-letter {
+  text-transform: uppercase;
+}
+
+.adminStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.adminStat:last-of-type {
+  margin-bottom: 0;
+}
+
+.adminStatLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.adminStatValue {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.adminEmpty {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  padding: 24px;
 }
 
 /* ─── Responsive ─── */

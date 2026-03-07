@@ -10,12 +10,16 @@ export const pool = new Pool({
 });
 
 export async function initDb() {
-  const { rows: colCheck } = await pool.query(`
+  const { rows: personaCol } = await pool.query(`
     SELECT column_name FROM information_schema.columns
     WHERE table_name = 'users' AND column_name = 'persona_id'
   `);
-  if (colCheck.length === 0) {
-    await pool.query("DROP TABLE IF EXISTS pending_items, schedule_events, follow_ups, meeting_summaries, highlights, users, personas CASCADE");
+  const { rows: adminCol } = await pool.query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'is_admin'
+  `);
+  if (personaCol.length === 0 || adminCol.length === 0) {
+    await pool.query("DROP TABLE IF EXISTS daily_table_stats, pending_items, schedule_events, follow_ups, meeting_summaries, highlights, users, personas CASCADE");
     console.log("Dropped old tables for schema migration.");
   }
 
@@ -35,6 +39,7 @@ export async function initDb() {
       name VARCHAR(255) NOT NULL,
       role VARCHAR(100) NOT NULL,
       persona_id INTEGER REFERENCES personas(id),
+      is_admin BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
@@ -94,8 +99,49 @@ export async function initDb() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_table_stats (
+      id SERIAL PRIMARY KEY,
+      table_name VARCHAR(100) NOT NULL,
+      stat_date DATE NOT NULL,
+      processed_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      failed_reason TEXT,
+      UNIQUE(table_name, stat_date)
+    )
+  `);
+
   const { rows: personaCheck } = await pool.query("SELECT COUNT(*) FROM personas");
-  if (parseInt(personaCheck[0].count, 10) > 0) return;
+  if (parseInt(personaCheck[0].count, 10) > 0) {
+    const { rows: adminCheck } = await pool.query("SELECT id FROM users WHERE is_admin = TRUE LIMIT 1");
+    if (adminCheck.length === 0) {
+      const hash = await bcrypt.hash("Abcd@1234", 10);
+      await pool.query(
+        "INSERT INTO users (email, password, name, role, persona_id, is_admin) VALUES ($1, $2, $3, $4, NULL, TRUE) ON CONFLICT (email) DO NOTHING",
+        ["admin@collabforce.com", hash, "Admin User", "Admin"],
+      );
+    }
+    const { rows: statsCheck } = await pool.query("SELECT COUNT(*) FROM daily_table_stats");
+    if (parseInt(statsCheck[0].count, 10) === 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const statsSeed: [string, number, number, string | null][] = [
+        ["personas", 5, 0, null],
+        ["users", 12, 1, "Duplicate email on insert"],
+        ["highlights", 24, 0, null],
+        ["meeting_summaries", 18, 2, "Invalid time_slot for persona 3"],
+        ["follow_ups", 32, 0, null],
+        ["schedule_events", 28, 1, "Missing required actions array"],
+        ["pending_items", 22, 0, null],
+      ];
+      for (const [tname, processed, failed, reason] of statsSeed) {
+        await pool.query(
+          "INSERT INTO daily_table_stats (table_name, stat_date, processed_count, failed_count, failed_reason) VALUES ($1, $2, $3, $4, $5)",
+          [tname, today, processed, failed, reason],
+        );
+      }
+    }
+    return;
+  }
 
   await seedAll();
 }
@@ -123,13 +169,36 @@ async function seedAll() {
     { email: "developer@collabforce.com", name: "Alex Johnson", role: "Developer", persona: "Engineer" },
     { email: "manager@collabforce.com", name: "Sarah Mitchell", role: "Manager", persona: "Manager" },
     { email: "pm@collabforce.com", name: "David Chen", role: "Project Manager", persona: "Product Manager" },
-    { email: "leadership@collabforce.com", name: "Rachel Torres", role: "VP of Engineering", persona: "Executive" },
+    { email: "leadership@collabforce.com", name: "Rachel Torres", role: "SVP of Engineering", persona: "Executive" },
   ];
 
   for (const u of users) {
     await pool.query(
-      "INSERT INTO users (email, password, name, role, persona_id) VALUES ($1, $2, $3, $4, $5)",
+      "INSERT INTO users (email, password, name, role, persona_id, is_admin) VALUES ($1, $2, $3, $4, $5, FALSE)",
       [u.email, hash, u.name, u.role, personaMap[u.persona]],
+    );
+  }
+
+  await pool.query(
+    "INSERT INTO users (email, password, name, role, persona_id, is_admin) VALUES ($1, $2, $3, $4, NULL, TRUE)",
+    ["admin@collabforce.com", hash, "Admin User", "Admin"],
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+  const tableNames = ["personas", "users", "highlights", "meeting_summaries", "follow_ups", "schedule_events", "pending_items"];
+  const statsSeed: [string, number, number, string | null][] = [
+    ["personas", 5, 0, null],
+    ["users", 12, 1, "Duplicate email on insert"],
+    ["highlights", 24, 0, null],
+    ["meeting_summaries", 18, 2, "Invalid time_slot for persona 3"],
+    ["follow_ups", 32, 0, null],
+    ["schedule_events", 28, 1, "Missing required actions array"],
+    ["pending_items", 22, 0, null],
+  ];
+  for (const [tname, processed, failed, reason] of statsSeed) {
+    await pool.query(
+      "INSERT INTO daily_table_stats (table_name, stat_date, processed_count, failed_count, failed_reason) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (table_name, stat_date) DO NOTHING",
+      [tname, today, processed, failed, reason],
     );
   }
 

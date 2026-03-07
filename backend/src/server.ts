@@ -38,15 +38,16 @@ fastify.post<{ Body: { email: string; password: string } }>(
       return reply.status(401).send({ error: "Invalid email or password." });
     }
 
+    const isAdmin = !!user.is_admin;
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, role: user.role },
+      { id: user.id, email: user.email, name: user.name, role: user.role, isAdmin },
       JWT_SECRET,
       { expiresIn: "24h" },
     );
 
     return {
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, isAdmin },
     };
   },
 );
@@ -58,13 +59,52 @@ fastify.get("/api/auth/me", async (request, reply) => {
   }
 
   try {
-    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as {
-      id: number;
-      email: string;
-      name: string;
-      role: string;
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows } = await pool.query(
+      "SELECT id, email, name, role, is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (rows.length === 0) {
+      return reply.status(401).send({ error: "User not found." });
+    }
+    const u = rows[0];
+    return {
+      user: {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        isAdmin: !!u.is_admin,
+      },
     };
-    return { user: payload };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
+fastify.get("/api/admin/stats", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (userRows.length === 0 || !userRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const { rows } = await pool.query(
+      "SELECT table_name AS \"tableName\", stat_date AS \"statDate\", processed_count AS \"processedCount\", failed_count AS \"failedCount\", failed_reason AS \"failedReason\" FROM daily_table_stats WHERE stat_date = $1 ORDER BY table_name",
+      [today],
+    );
+
+    return { stats: rows };
   } catch {
     return reply.status(401).send({ error: "Invalid or expired token." });
   }

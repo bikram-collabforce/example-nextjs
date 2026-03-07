@@ -13,6 +13,15 @@ interface AuthUser {
   name: string;
   email: string;
   role: string;
+  isAdmin?: boolean;
+}
+
+interface AdminTableStat {
+  tableName: string;
+  statDate: string;
+  processedCount: number;
+  failedCount: number;
+  failedReason: string | null;
 }
 
 const USER_PHOTOS: Record<string, string> = {
@@ -20,6 +29,7 @@ const USER_PHOTOS: Record<string, string> = {
   "manager@collabforce.com": "https://randomuser.me/api/portraits/women/44.jpg",
   "pm@collabforce.com": "https://randomuser.me/api/portraits/men/75.jpg",
   "leadership@collabforce.com": "https://randomuser.me/api/portraits/women/68.jpg",
+  "admin@collabforce.com": "https://randomuser.me/api/portraits/men/1.jpg",
 };
 
 export default function App() {
@@ -31,7 +41,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [activeView, setActiveView] = useState<"dashboard" | "admin">("dashboard");
   const [data, setData] = useState<DashboardData | null>(null);
+  const [adminStats, setAdminStats] = useState<AdminTableStat[] | null>(null);
+  const [adminStatsError, setAdminStatsError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -76,6 +89,22 @@ export default function App() {
       .then(setData)
       .catch(console.error);
   }, [token]);
+
+  useEffect(() => {
+    if (!token || activeView !== "admin") return;
+    setAdminStatsError(null);
+    setAdminStats(null);
+    fetch(`${API_BASE}/api/admin/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (r.status === 403) throw new Error("Access denied.");
+        if (!r.ok) throw new Error("Failed to load stats.");
+        return r.json();
+      })
+      .then((d) => setAdminStats(d.stats))
+      .catch((e) => setAdminStatsError(e.message || "Failed to load stats."));
+  }, [token, activeView]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -137,9 +166,13 @@ export default function App() {
         </div>
 
         <div className={styles.sidebarSection}>Main</div>
-        <a className={styles.navItemActive} href="#">
+        <button
+          type="button"
+          className={activeView === "dashboard" ? styles.navItemActive : styles.navItem}
+          onClick={() => setActiveView("dashboard")}
+        >
           <span className={styles.navIcon}>📊</span> Dashboard
-        </a>
+        </button>
         <a className={styles.navItem} href="#">
           <span className={styles.navIcon}>💬</span> Chat
         </a>
@@ -158,6 +191,20 @@ export default function App() {
           <span className={styles.navIcon}>⚙️</span> Settings
         </a>
 
+        {user?.isAdmin && (
+          <>
+            <hr className={styles.sidebarDivider} />
+            <div className={styles.sidebarSection}>Administration</div>
+            <button
+              type="button"
+              className={activeView === "admin" ? styles.navItemActive : styles.navItem}
+              onClick={() => setActiveView("admin")}
+            >
+              <span className={styles.navIcon}>⚙️</span> Administration
+            </button>
+          </>
+        )}
+
         <hr className={styles.sidebarDivider} />
 
         <div className={styles.sidebarFooter}>
@@ -173,9 +220,11 @@ export default function App() {
         <div className={styles.topBar}>
           <div>
             <div className={styles.breadcrumb}>
-              Pages / <span>Dashboard</span>
+              Pages / <span>{activeView === "admin" ? "Administration" : "Dashboard"}</span>
             </div>
-            <h1 className={styles.pageTitle}>Your Day at a Glance</h1>
+            <h1 className={styles.pageTitle}>
+              {activeView === "admin" ? "Table statistics" : "Your Day at a Glance"}
+            </h1>
           </div>
           <div className={styles.userMenu}>
             <img
@@ -193,6 +242,43 @@ export default function App() {
           </div>
         </div>
 
+        {activeView === "admin" ? (
+          <div className={styles.adminContent}>
+            {adminStatsError && (
+              <div className={styles.adminError}>{adminStatsError}</div>
+            )}
+            {adminStats === null && !adminStatsError && (
+              <div className={styles.loading}>Loading stats…</div>
+            )}
+            {adminStats && adminStats.length > 0 && (
+              <div className={styles.adminGrid}>
+                {adminStats.map((stat) => (
+                  <div key={stat.tableName} className={styles.adminCard}>
+                    <div className={styles.adminCardTitle}>{stat.tableName}</div>
+                    <div className={styles.adminStat}>
+                      <span className={styles.adminStatLabel}>Daily processed</span>
+                      <span className={styles.adminStatValue}>{stat.processedCount}</span>
+                    </div>
+                    <div className={styles.adminStat}>
+                      <span className={styles.adminStatLabel}>Failed</span>
+                      <span className={styles.adminStatValue}>{stat.failedCount}</span>
+                    </div>
+                    <div className={styles.adminStat}>
+                      <span className={styles.adminStatLabel}>Failed reason</span>
+                      <span className={styles.adminStatValue}>
+                        {stat.failedReason || "—"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {adminStats && adminStats.length === 0 && !adminStatsError && (
+              <div className={styles.adminEmpty}>No stats for today yet.</div>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Highlight */}
         <div className={styles.highlight}>
           <strong>{data.highlight.label}</strong> {data.highlight.text}
@@ -365,6 +451,8 @@ export default function App() {
             ))}
           </div>
         </div>
+          </>
+        )}
 
       </main>
     </div>
