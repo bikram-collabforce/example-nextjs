@@ -1173,6 +1173,52 @@
   max-width: 1000px;
 }
 
+.settingsTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  margin-bottom: 24px;
+}
+
+.settingsTab {
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.settingsTab:hover {
+  color: var(--text-primary, #1e293b);
+}
+
+.settingsTabActive {
+  composes: settingsTab;
+  color: var(--primary, #664ec2);
+  border-bottom-color: var(--primary, #664ec2);
+}
+
+.settingsTabPanel {
+  padding: 8px 0;
+}
+
+.settingsPanelTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text-primary, #1e293b);
+}
+
+.settingsPanelText {
+  font-size: 0.95rem;
+  color: var(--text-secondary, #64748b);
+  margin: 0;
+}
+
 .settingsTiles {
   display: flex;
   flex-direction: column;
@@ -1216,6 +1262,53 @@
 .settingsTile:hover {
   border-color: var(--accent);
   background: var(--accent-light);
+}
+
+.settingsTileLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.settingsTileLogoWrap {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+  background: var(--body-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settingsTileLogo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  line-height: 0;
+}
+
+.settingsTileLogo svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.settingsTileLogoFallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--body-bg);
 }
 
 .settingsTileDisabled {
