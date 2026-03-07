@@ -1,5 +1,10 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { pool, initDb } from "./db";
+
+const JWT_SECRET = "digital-twin-secret-key-2024";
 
 const fastify = Fastify({ logger: true });
 
@@ -7,6 +12,62 @@ fastify.register(cors, { origin: true });
 
 fastify.get("/api/health", async () => {
   return { status: "ok", timestamp: new Date().toISOString() };
+});
+
+fastify.post<{ Body: { email: string; password: string } }>(
+  "/api/auth/login",
+  async (request, reply) => {
+    const { email, password } = request.body;
+
+    if (!email || !password) {
+      return reply.status(400).send({ error: "Email and password are required." });
+    }
+
+    const { rows } = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email.toLowerCase().trim(),
+    ]);
+
+    if (rows.length === 0) {
+      return reply.status(401).send({ error: "Invalid email or password." });
+    }
+
+    const user = rows[0];
+    const valid = await bcrypt.compare(password, user.password);
+
+    if (!valid) {
+      return reply.status(401).send({ error: "Invalid email or password." });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, name: user.name, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "24h" },
+    );
+
+    return {
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    };
+  },
+);
+
+fastify.get("/api/auth/me", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as {
+      id: number;
+      email: string;
+      name: string;
+      role: string;
+    };
+    return { user: payload };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
 });
 
 fastify.get("/api/dashboard", async () => {
@@ -171,6 +232,8 @@ const start = async () => {
   const port = Number(process.env.PORT) || 4000;
   const host = process.env.HOST || "0.0.0.0";
   try {
+    await initDb();
+    fastify.log.info("Database initialized and users seeded.");
     await fastify.listen({ port, host });
   } catch (err) {
     fastify.log.error(err);

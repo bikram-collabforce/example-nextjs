@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { DashboardData, ChatMessage } from "./types";
+import Login from "./Login";
 import styles from "./App.module.css";
 
 const API_BASE =
@@ -8,19 +9,64 @@ const API_BASE =
     ? "https://employee-agent-api.up.railway.app"
     : "");
 
+interface AuthUser {
+  name: string;
+  email: string;
+  role: string;
+}
+
 export default function App() {
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("token"),
+  );
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const saved = localStorage.getItem("user");
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [data, setData] = useState<DashboardData | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const handleLogin = useCallback((newToken: string, newUser: AuthUser) => {
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(newUser));
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    setData(null);
+    setChatMessages([]);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  }, []);
+
   useEffect(() => {
+    if (!token) return;
+
+    fetch(`${API_BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("invalid");
+        return r.json();
+      })
+      .then((d) => setUser(d.user))
+      .catch(() => handleLogout());
+  }, [token, handleLogout]);
+
+  useEffect(() => {
+    if (!token) return;
     fetch(`${API_BASE}/api/dashboard`)
       .then((r) => r.json())
       .then(setData)
       .catch(console.error);
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,6 +109,10 @@ export default function App() {
       setSending(false);
     }
   };
+
+  if (!token || !user) {
+    return <Login apiBase={API_BASE} onLogin={handleLogin} />;
+  }
 
   if (!data) {
     return <div className={styles.loading}>Loading dashboard…</div>;
@@ -116,7 +166,16 @@ export default function App() {
             <div className={styles.breadcrumb}>
               Pages / <span>Dashboard</span>
             </div>
-            <h1 className={styles.pageTitle}>Your Day at a Glance !!!</h1>
+            <h1 className={styles.pageTitle}>Your Day at a Glance</h1>
+          </div>
+          <div className={styles.userMenu}>
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>{user.name}</span>
+              <span className={styles.userRole}>{user.role}</span>
+            </div>
+            <button className={styles.logoutBtn} onClick={handleLogout}>
+              Sign Out
+            </button>
           </div>
         </div>
 
