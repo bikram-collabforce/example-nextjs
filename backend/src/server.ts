@@ -110,6 +110,43 @@ fastify.get("/api/admin/stats", async (request, reply) => {
   }
 });
 
+fastify.get("/api/integrations", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows } = await pool.query(
+      `SELECT service_key AS "serviceKey", display_name AS "displayName", group_name AS "groupName", enabled
+       FROM integrations ORDER BY group_name, display_name`,
+    );
+    return { integrations: rows };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
+fastify.get("/api/me/connections", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows } = await pool.query(
+      `SELECT i.service_key AS "serviceKey"
+       FROM user_oauth_connections uoc
+       JOIN integrations i ON i.id = uoc.integration_id
+       WHERE uoc.user_id = $1`,
+      [payload.id],
+    );
+    return { connectedServiceKeys: rows.map((r) => r.serviceKey) };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
 fastify.get("/api/admin/integrations", async (request, reply) => {
   const auth = request.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {

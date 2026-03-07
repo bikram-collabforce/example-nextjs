@@ -154,7 +154,7 @@ export async function initDb() {
     )
   `);
 
-  await seedIntegrationTypes();
+  // await seedIntegrationTypes();
 
   // user_oauth_connections: per-user tokens (integrations = app config only)
   await pool.query(`
@@ -175,50 +175,50 @@ export async function initDb() {
   await pool.query("ALTER TABLE integrations DROP COLUMN IF EXISTS refresh_token");
   await pool.query("ALTER TABLE integrations DROP COLUMN IF EXISTS token_expires_at");
 
-  const { rows: personaCheck } = await pool.query("SELECT COUNT(*) FROM persona");
-  if (parseInt(personaCheck[0].count, 10) > 0) {
-    const { rows: adminCheck } = await pool.query("SELECT id FROM users WHERE is_admin = TRUE LIMIT 1");
-    if (adminCheck.length === 0) {
-      const hash = await bcrypt.hash("Abcd@1234", 10);
-      await pool.query(
-        "INSERT INTO users (email, password, name, role, persona_id, is_admin) VALUES ($1, $2, $3, $4, NULL, TRUE) ON CONFLICT (email) DO NOTHING",
-        ["admin@collabforce.org", hash, "Admin User", "Admin"],
-      );
-    }
-    const { rows: statsCheck } = await pool.query("SELECT COUNT(*) FROM daily_table_stats");
-    if (parseInt(statsCheck[0].count, 10) === 0) {
-      const today = new Date().toISOString().slice(0, 10);
-      const statsSeed: [string, number, number, string | null][] = [
-        ["persona", 5, 0, null],
-        ["users", 12, 1, "Duplicate email on insert"],
-        ["highlights", 24, 0, null],
-        ["meeting_summaries", 18, 2, "Invalid time_slot"],
-        ["follow_ups", 32, 0, null],
-        ["schedule_events", 28, 1, "Missing required actions array"],
-        ["pending_items", 22, 0, null],
-      ];
-      for (const [tname, processed, failed, reason] of statsSeed) {
-        await pool.query(
-          "INSERT INTO daily_table_stats (table_name, stat_date, processed_count, failed_count, failed_reason) VALUES ($1, $2, $3, $4, $5)",
-          [tname, today, processed, failed, reason],
-        );
-      }
-    }
-    const { rows: highlightsCheck } = await pool.query("SELECT COUNT(*) FROM highlights WHERE user_id IS NOT NULL");
-    if (parseInt(highlightsCheck[0].count, 10) === 0) {
-      const { rows: personaRows } = await pool.query("SELECT id, name FROM persona");
-      const personaMap: Record<string, number> = {};
-      for (const r of personaRows) personaMap[r.name] = r.id;
-      const { rows: userRows } = await pool.query("SELECT id, persona_id FROM users WHERE persona_id IS NOT NULL");
-      if (Object.keys(personaMap).length >= 5 && userRows.length > 0) {
-        await seedDashboardDataForUsers(personaMap, userRows as { id: number; persona_id: number }[]);
-        console.log("Seeded dashboard data per user (highlights, meetings, follow-ups, schedule, pending).");
-      }
-    }
-    return;
-  }
-
-  await seedAll();
+  // ─── Data seeding commented out ───
+  // const { rows: personaCheck } = await pool.query("SELECT COUNT(*) FROM persona");
+  // if (parseInt(personaCheck[0].count, 10) > 0) {
+  //   const { rows: adminCheck } = await pool.query("SELECT id FROM users WHERE is_admin = TRUE LIMIT 1");
+  //   if (adminCheck.length === 0) {
+  //     const hash = await bcrypt.hash("Abcd@1234", 10);
+  //     await pool.query(
+  //       "INSERT INTO users (email, password, name, role, persona_id, is_admin) VALUES ($1, $2, $3, $4, NULL, TRUE) ON CONFLICT (email) DO NOTHING",
+  //       ["admin@collabforce.org", hash, "Admin User", "Admin"],
+  //     );
+  //   }
+  //   const { rows: statsCheck } = await pool.query("SELECT COUNT(*) FROM daily_table_stats");
+  //   if (parseInt(statsCheck[0].count, 10) === 0) {
+  //     const today = new Date().toISOString().slice(0, 10);
+  //     const statsSeed: [string, number, number, string | null][] = [
+  //       ["persona", 5, 0, null],
+  //       ["users", 12, 1, "Duplicate email on insert"],
+  //       ["highlights", 24, 0, null],
+  //       ["meeting_summaries", 18, 2, "Invalid time_slot"],
+  //       ["follow_ups", 32, 0, null],
+  //       ["schedule_events", 28, 1, "Missing required actions array"],
+  //       ["pending_items", 22, 0, null],
+  //     ];
+  //     for (const [tname, processed, failed, reason] of statsSeed) {
+  //       await pool.query(
+  //         "INSERT INTO daily_table_stats (table_name, stat_date, processed_count, failed_count, failed_reason) VALUES ($1, $2, $3, $4, $5)",
+  //         [tname, today, processed, failed, reason],
+  //       );
+  //     }
+  //   }
+  //   const { rows: highlightsCheck } = await pool.query("SELECT COUNT(*) FROM highlights WHERE user_id IS NOT NULL");
+  //   if (parseInt(highlightsCheck[0].count, 10) === 0) {
+  //     const { rows: personaRows } = await pool.query("SELECT id, name FROM persona");
+  //     const personaMap: Record<string, number> = {};
+  //     for (const r of personaRows) personaMap[r.name] = r.id;
+  //     const { rows: userRows } = await pool.query("SELECT id, persona_id FROM users WHERE persona_id IS NOT NULL");
+  //     if (Object.keys(personaMap).length >= 5 && userRows.length > 0) {
+  //       await seedDashboardDataForUsers(personaMap, userRows as { id: number; persona_id: number }[]);
+  //       console.log("Seeded dashboard data per user (highlights, meetings, follow-ups, schedule, pending).");
+  //     }
+  //   }
+  //   return;
+  // }
+  // await seedAll();
 }
 
 /** Drops all tables, then runs initDb() to recreate schema and seed. Call only with admin confirmation. */

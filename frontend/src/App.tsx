@@ -41,7 +41,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [activeView, setActiveView] = useState<"dashboard" | "statistics" | "administration">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "statistics" | "administration" | "settings">("dashboard");
   const [data, setData] = useState<DashboardData | null>(null);
   const [adminStats, setAdminStats] = useState<AdminTableStat[] | null>(null);
   const [adminStatsError, setAdminStatsError] = useState<string | null>(null);
@@ -55,7 +55,6 @@ export default function App() {
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [userForm, setUserForm] = useState({ email: "", password: "", name: "", role: "", persona_id: "" });
   const [createUserError, setCreateUserError] = useState<string | null>(null);
-  const [createUserSuccess, setCreateUserSuccess] = useState(false);
   interface UserListItem { id: number; email: string; name: string; role: string; personaId: number | null; isAdmin: boolean }
   const [usersList, setUsersList] = useState<UserListItem[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
@@ -66,6 +65,11 @@ export default function App() {
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
   const [savingUser, setSavingUser] = useState(false);
+  interface SettingsIntegration { serviceKey: string; displayName: string; groupName: string; enabled: boolean }
+  const [settingsIntegrations, setSettingsIntegrations] = useState<SettingsIntegration[] | null>(null);
+  const [settingsConnectedKeys, setSettingsConnectedKeys] = useState<Set<string>>(new Set());
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [factoryResetConfirmOpen, setFactoryResetConfirmOpen] = useState(false);
   const [factoryResetLoading, setFactoryResetLoading] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
@@ -94,7 +98,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const navTo = useCallback((view: "dashboard" | "statistics" | "administration") => {
+  const navTo = useCallback((view: "dashboard" | "statistics" | "administration" | "settings") => {
     setActiveView(view);
     setMobileMenuOpen(false);
   }, []);
@@ -207,6 +211,22 @@ export default function App() {
   }, [token, activeView, adminSubTab, usersPage]);
 
   useEffect(() => {
+    if (!token || activeView !== "settings") return;
+    setSettingsError(null);
+    setSettingsLoading(true);
+    Promise.all([
+      fetch(`${API_BASE}/api/integrations`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : Promise.reject(new Error("Failed")))),
+      fetch(`${API_BASE}/api/me/connections`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : Promise.reject(new Error("Failed")))),
+    ])
+      .then(([intRes, connRes]) => {
+        setSettingsIntegrations(intRes.integrations || []);
+        setSettingsConnectedKeys(new Set(connRes.connectedServiceKeys || []));
+      })
+      .catch(() => setSettingsError("Failed to load integrations."))
+      .finally(() => setSettingsLoading(false));
+  }, [token, activeView]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
@@ -295,7 +315,6 @@ export default function App() {
     setEditingUser(null);
     setUserForm({ email: "", password: "", name: "", role: "", persona_id: "" });
     setCreateUserError(null);
-    setCreateUserSuccess(false);
     setUserModalOpen(true);
   }, []);
 
@@ -309,7 +328,6 @@ export default function App() {
       persona_id: u.personaId != null ? String(u.personaId) : "",
     });
     setCreateUserError(null);
-    setCreateUserSuccess(false);
     setUserModalOpen(true);
   }, []);
 
@@ -317,13 +335,11 @@ export default function App() {
     setUserModalOpen(false);
     setEditingUser(null);
     setCreateUserError(null);
-    setCreateUserSuccess(false);
   }, []);
 
   const saveUser = useCallback(async () => {
     if (!token) return;
     setCreateUserError(null);
-    setCreateUserSuccess(false);
     setSavingUser(true);
     const isEdit = editingUser != null;
     if (!userForm.email.trim()) {
@@ -530,7 +546,11 @@ export default function App() {
         <button type="button" className={styles.navItem}>
           <span className={styles.navIcon}>📁</span> Files
         </button>
-        <button type="button" className={styles.navItem}>
+        <button
+          type="button"
+          className={activeView === "settings" ? styles.navItemActive : styles.navItem}
+          onClick={() => navTo("settings")}
+        >
           <span className={styles.navIcon}>⚙️</span> Settings
         </button>
 
@@ -608,7 +628,9 @@ export default function App() {
                   ? "Statistics"
                   : activeView === "administration"
                     ? "Administration"
-                    : "Dashboard"}
+                    : activeView === "settings"
+                      ? "Settings"
+                      : "Dashboard"}
               </span>
             </div>
             <h1 className={styles.pageTitle}>
@@ -618,7 +640,9 @@ export default function App() {
                   ? adminSubTab === "users"
                     ? "User and data management"
                     : "Integrations & onboarding"
-                  : "Your Day at a Glance"}
+                  : activeView === "settings"
+                    ? "Connect integrations"
+                    : "Your Day at a Glance"}
             </h1>
           </div>
           <div className={styles.topBarRight}>
@@ -649,7 +673,63 @@ export default function App() {
           </div>
         </div>
 
-        {activeView === "statistics" ? (
+        {activeView === "settings" ? (
+          <div className={styles.settingsContent}>
+            {settingsError && (
+              <div className={styles.adminError}>{settingsError}</div>
+            )}
+            {settingsLoading && (
+              <div className={styles.loading}>Loading…</div>
+            )}
+            {!settingsLoading && settingsIntegrations && settingsIntegrations.length > 0 && (
+              <div className={styles.settingsTiles}>
+                {Array.from(new Set(settingsIntegrations.map((i) => i.groupName))).map((groupName) => (
+                  <div key={groupName} className={styles.settingsGroup}>
+                    <h3 className={styles.settingsGroupTitle}>{groupName}</h3>
+                    <div className={styles.settingsTileGrid}>
+                      {settingsIntegrations
+                        .filter((i) => i.groupName === groupName)
+                        .map((int) => {
+                          const connected = settingsConnectedKeys.has(int.serviceKey);
+                          const disabled = !int.enabled;
+                          return (
+                            <div
+                              key={int.serviceKey}
+                              className={
+                                disabled
+                                  ? styles.settingsTileDisabled
+                                  : connected
+                                    ? styles.settingsTileConnected
+                                    : styles.settingsTile
+                              }
+                            >
+                              <span className={styles.settingsTileName}>{int.displayName}</span>
+                              {disabled ? (
+                                <span className={styles.settingsTileBadge}>Disabled by admin</span>
+                              ) : connected ? (
+                                <span className={styles.settingsTileBadgeConnected}>Connected</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={styles.settingsConnectBtn}
+                                  onClick={() => {}}
+                                >
+                                  Connect now
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!settingsLoading && settingsIntegrations && settingsIntegrations.length === 0 && !settingsError && (
+              <div className={styles.adminEmpty}>No integrations available.</div>
+            )}
+          </div>
+        ) : activeView === "statistics" ? (
           <div className={styles.adminContent}>
             {adminStatsError && (
               <div className={styles.adminError}>{adminStatsError}</div>
