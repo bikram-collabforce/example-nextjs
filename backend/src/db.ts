@@ -1,15 +1,25 @@
 import { Pool } from "pg";
+import pgvector from "pgvector/pg";
 import bcrypt from "bcryptjs";
 
 const DATABASE_URL =
-  "postgresql://postgres:wZvXUnfkNQnAvrrcQqwdIbVkUBAIGnjr@shortline.proxy.rlwy.net:12476/railway";
+  "postgres://postgres:f6h3BuPNsNHLJg.8m37-HpRWz6nfFw25@hopper.proxy.rlwy.net:59401/railway";
 
 export const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: false,
 });
 
 export async function initDb() {
+  // ─── pgvector (Railway pgvector) ───
+  const client = await pool.connect();
+  try {
+    await client.query("CREATE EXTENSION IF NOT EXISTS vector");
+    await pgvector.registerTypes(client);
+  } finally {
+    client.release();
+  }
+
   // ─── Persona ───
   const { rows: rpExist } = await pool.query(
     "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'role_persona'",
