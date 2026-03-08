@@ -74,9 +74,9 @@ export default function App() {
   const [adminSubTab, setAdminSubTab] = useState<"integrations" | "users">("integrations");
   interface PersonaOption { id: number; name: string }
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
-  const [userForm, setUserForm] = useState({ email: "", password: "", name: "", role: "", persona_id: "" });
+  const [userForm, setUserForm] = useState({ email: "", password: "", name: "", role: "", persona_id: "", uuid: "" });
   const [createUserError, setCreateUserError] = useState<string | null>(null);
-  interface UserListItem { id: number; email: string; name: string; role: string; personaId: number | null; isAdmin: boolean }
+  interface UserListItem { id: number; email: string; name: string; role: string; personaId: number | null; isAdmin: boolean; uuid?: string | null }
   const [usersList, setUsersList] = useState<UserListItem[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [usersPage, setUsersPage] = useState(1);
@@ -86,6 +86,7 @@ export default function App() {
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
   const [savingUser, setSavingUser] = useState(false);
+  const [userEditLoadingId, setUserEditLoadingId] = useState<number | null>(null);
   interface SettingsIntegration { serviceKey: string; displayName: string; groupName: string; enabled: boolean }
   const [settingsIntegrations, setSettingsIntegrations] = useState<SettingsIntegration[] | null>(null);
   const [settingsConnectedKeys, setSettingsConnectedKeys] = useState<Set<string>>(new Set());
@@ -346,23 +347,39 @@ export default function App() {
 
   const openUserModalCreate = useCallback(() => {
     setEditingUser(null);
-    setUserForm({ email: "", password: "", name: "", role: "", persona_id: "" });
+    setUserForm({ email: "", password: "", name: "", role: "", persona_id: "", uuid: "" });
     setCreateUserError(null);
     setUserModalOpen(true);
   }, []);
 
-  const openUserModalEdit = useCallback((u: UserListItem) => {
-    setEditingUser(u);
-    setUserForm({
-      email: u.email,
-      password: "",
-      name: u.name,
-      role: u.role,
-      persona_id: u.personaId != null ? String(u.personaId) : "",
-    });
+  const openUserModalEdit = useCallback(async (u: UserListItem) => {
+    if (!token) return;
     setCreateUserError(null);
-    setUserModalOpen(true);
-  }, []);
+    setUserEditLoadingId(u.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${u.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setCreateUserError(err?.error ?? "Failed to load user.");
+        return;
+      }
+      const user = await res.json() as UserListItem;
+      setEditingUser(user);
+      setUserForm({
+        email: user.email,
+        password: "",
+        name: user.name,
+        role: user.role,
+        persona_id: user.personaId != null ? String(user.personaId) : "",
+        uuid: user.uuid ?? "",
+      });
+      setUserModalOpen(true);
+    } finally {
+      setUserEditLoadingId(null);
+    }
+  }, [token]);
 
   const closeUserModal = useCallback(() => {
     setUserModalOpen(false);
@@ -426,7 +443,7 @@ export default function App() {
           setCreateUserError(data.error || "Failed to create user.");
           return;
         }
-        setUserForm({ email: "", password: "", name: "", role: "", persona_id: "" });
+        setUserForm({ email: "", password: "", name: "", role: "", persona_id: "", uuid: "" });
       }
       closeUserModal();
       const pageToRefetch = isEdit ? usersPage : 1;
@@ -799,7 +816,7 @@ export default function App() {
                                     }
                                   }}
                                 >
-                                  Connect now
+                                  Connect
                                 </button>
                               )}
                             </div>
@@ -949,6 +966,9 @@ export default function App() {
                   {usersError && (
                     <div className={styles.adminError}>{usersError}</div>
                   )}
+                  {createUserError && !userModalOpen && (
+                    <div className={styles.adminError}>{createUserError}</div>
+                  )}
                   {usersLoading && (
                     <div className={styles.loading}>Loading users…</div>
                   )}
@@ -958,29 +978,34 @@ export default function App() {
                         <table className={styles.userTable}>
                           <thead>
                             <tr>
+                              <th>User ID</th>
                               <th>Email</th>
                               <th>Name</th>
                               <th>Role</th>
                               <th>Persona</th>
                               <th>Admin</th>
+                              <th>UUID</th>
                               <th></th>
                             </tr>
                           </thead>
                           <tbody>
                             {usersList.map((u) => (
                               <tr key={u.id}>
+                                <td>{u.id}</td>
                                 <td>{u.email}</td>
                                 <td>{u.name}</td>
                                 <td>{u.role}</td>
                                 <td>{personas.find((p) => p.id === u.personaId)?.name ?? "—"}</td>
                                 <td>{u.isAdmin ? "Yes" : "—"}</td>
+                                <td className={styles.uuidCell}>{u.uuid ?? "—"}</td>
                                 <td>
                                   <button
                                     type="button"
                                     className={styles.userEditBtn}
                                     onClick={() => openUserModalEdit(u)}
+                                    disabled={userEditLoadingId !== null}
                                   >
-                                    Edit
+                                    {userEditLoadingId === u.id ? "Loading…" : "Edit"}
                                   </button>
                                 </td>
                               </tr>
@@ -1281,7 +1306,7 @@ export default function App() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 id="user-modal-title" className={styles.modalTitle}>
-                {editingUser ? "Edit user" : "Create user"}
+                {editingUser ? `Edit user (ID: ${editingUser.id})` : "Create user"}
               </h2>
               {createUserError && (
                 <div className={styles.adminError}>{createUserError}</div>
@@ -1339,6 +1364,18 @@ export default function App() {
                       <option key={p.id} value={String(p.id)}>{p.name}</option>
                     ))}
                   </select>
+                </label>
+                <label className={styles.userFormLabel}>
+                  UUID (for integrations)
+                  <input
+                    type="text"
+                    className={styles.userFormInput}
+                    value={userForm.uuid || "—"}
+                    readOnly
+                    disabled
+                    placeholder="Generated on save if empty"
+                    title="Used to identify this user with external services (e.g. Composio). Auto-generated when empty."
+                  />
                 </label>
               </div>
               <div className={styles.modalActions}>

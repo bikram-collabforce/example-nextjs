@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import bcrypt from "bcryptjs";
@@ -158,6 +159,19 @@ fastify.get("/api/integrations/gmail/connect", async (request, reply) => {
   }
   try {
     const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: userRows } = await pool.query(
+      "SELECT id, uuid FROM users WHERE id = $1",
+      [payload.id] as unknown[],
+    );
+    if (userRows.length === 0) {
+      return reply.status(401).send({ error: "User not found." });
+    }
+    let userUuid = userRows[0].uuid as string | null;
+    // Only generate and persist UUID when missing; never overwrite existing
+    if (!userUuid || userUuid.trim() === "") {
+      userUuid = randomUUID();
+      await pool.query("UPDATE users SET uuid = $1 WHERE id = $2", [userUuid, payload.id] as unknown[]);
+    }
     const { rows: gmailRows } = await pool.query(
       "SELECT id, api_key, enabled FROM integrations WHERE service_key = $1",
       ["gmail"],
@@ -166,8 +180,7 @@ fastify.get("/api/integrations/gmail/connect", async (request, reply) => {
       return reply.status(400).send({ error: "Gmail integration not configured or not enabled." });
     }
     const apiKey = gmailRows[0].api_key;
-    const userId = String(payload.id);
-    const callbackUrl = `${BACKEND_URL}/api/integrations/gmail/callback?user_id=${userId}`;
+    const callbackUrl = `${BACKEND_URL}/api/integrations/gmail/callback?user_id=${encodeURIComponent(userUuid)}`;
 
     const authRes = await fetch(`${COMPOSIO_BASE}/auth_configs?toolkit_slug=gmail&limit=5`, {
       headers: { "x-api-key": apiKey },
@@ -186,7 +199,7 @@ fastify.get("/api/integrations/gmail/connect", async (request, reply) => {
       method: "POST",
       headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
-        user_id: userId,
+        user_id: userUuid,
         auth_config_id: authConfigId,
         callback_url: callbackUrl,
       }),
@@ -208,24 +221,24 @@ fastify.get("/api/integrations/gmail/connect", async (request, reply) => {
   }
 });
 
-// ─── Composio Gmail: OAuth callback (Composio redirects here) ───
+// ─── Composio Gmail: OAuth callback (Composio redirects here; user_id = uuid) ───
 fastify.get<{ Querystring: { user_id?: string; status?: string; connected_account_id?: string } }>(
   "/api/integrations/gmail/callback",
   async (request, reply) => {
-    const { user_id: userIdParam, status, connected_account_id: composioConnectedAccountId } = request.query;
+    const { user_id: userUuidParam, status, connected_account_id: composioConnectedAccountId } = request.query;
     const frontendSettings = `${FRONTEND_URL}/settings?gmail=connected`;
-    if (!userIdParam || status !== "success" || !composioConnectedAccountId) {
+    if (!userUuidParam || status !== "success" || !composioConnectedAccountId) {
       return reply.redirect(`${frontendSettings}&error=callback_params`, 302);
     }
-    const userId = parseInt(userIdParam, 10);
-    if (Number.isNaN(userId)) {
-      return reply.redirect(`${frontendSettings}&error=invalid_user`, 302);
-    }
     try {
-      const { rows: userRows } = await pool.query("SELECT id FROM users WHERE id = $1", [userId] as unknown[]);
+      const { rows: userRows } = await pool.query(
+        "SELECT id FROM users WHERE uuid = $1",
+        [userUuidParam.trim()] as unknown[],
+      );
       if (userRows.length === 0) {
         return reply.redirect(`${frontendSettings}&error=user_not_found`, 302);
       }
+      const userId = userRows[0].id as number;
       const { rows: gmailRows } = await pool.query(
         "SELECT id, api_key FROM integrations WHERE service_key = $1",
         ["gmail"] as unknown[],
@@ -281,6 +294,31 @@ fastify.post("/api/webhooks/composio", async (request, reply) => {
   const metadata = payload?.metadata as Record<string, unknown> | undefined;
   const data = payload?.data as Record<string, unknown> | undefined;
   const triggerSlug = metadata?.trigger_slug as string | undefined;
+  const composioUserId = metadata?.user_id as string | undefined;
+
+  let ourUserId: number | null = null;
+  if (composioUserId) {
+    const { rows: u } = await pool.query(
+      "SELECT id FROM users WHERE uuid = $1",
+      [composioUserId] as unknown[],
+    );
+    if (u.length > 0) ourUserId = u[0].id as number;
+  }
+
+  await pool.query(
+    `INSERT INTO composio_webhook_events (user_id, composio_user_id, type, trigger_slug, trigger_id, connected_account_id, metadata, data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      ourUserId,
+      composioUserId ?? null,
+      type ?? null,
+      triggerSlug ?? null,
+      (metadata?.trigger_id as string) ?? null,
+      (metadata?.connected_account_id as string) ?? null,
+      metadata ? JSON.stringify(metadata) : null,
+      data ? JSON.stringify(data) : null,
+    ] as unknown[],
+  );
 
   console.log("[Composio Webhook] Full payload:", JSON.stringify(payload, null, 2));
 
@@ -454,13 +492,45 @@ fastify.get<{
     const [countRes, usersRes] = await Promise.all([
       pool.query("SELECT COUNT(*)::int AS total FROM users"),
       pool.query(
-        `SELECT u.id, u.email, u.name, u.role, u.persona_id AS "personaId", u.is_admin AS "isAdmin"
+        `SELECT u.id, u.email, u.name, u.role, u.persona_id AS "personaId", u.is_admin AS "isAdmin", u.uuid
          FROM users u ORDER BY u.email LIMIT $1 OFFSET $2`,
         [limit, offset],
       ),
     ]);
     const total = countRes.rows[0]?.total ?? 0;
     return { users: usersRes.rows, total, page, limit };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+});
+
+fastify.get<{ Params: { id: string } }>("/api/admin/users/:id", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: adminRows } = await pool.query(
+      "SELECT is_admin FROM users WHERE id = $1",
+      [payload.id],
+    );
+    if (adminRows.length === 0 || !adminRows[0].is_admin) {
+      return reply.status(403).send({ error: "Access denied." });
+    }
+    const id = parseInt(request.params.id, 10);
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: "Invalid user id." });
+    }
+    const { rows } = await pool.query(
+      `SELECT id, email, name, role, persona_id AS "personaId", is_admin AS "isAdmin", uuid
+       FROM users WHERE id = $1`,
+      [id],
+    );
+    if (rows.length === 0) {
+      return reply.status(404).send({ error: "User not found." });
+    }
+    return rows[0];
   } catch {
     return reply.status(401).send({ error: "Invalid or expired token." });
   }
@@ -520,6 +590,12 @@ fastify.patch<{
       `UPDATE users SET ${updates.join(", ")} WHERE id = $${idx}`,
       values,
     );
+    // Only set UUID when missing; never overwrite existing
+    const { rows: uuidCheck } = await pool.query("SELECT uuid FROM users WHERE id = $1", [id] as unknown[]);
+    if (uuidCheck.length > 0 && (uuidCheck[0].uuid == null || String(uuidCheck[0].uuid).trim() === "")) {
+      const newUuid = randomUUID();
+      await pool.query("UPDATE users SET uuid = $1 WHERE id = $2", [newUuid, id] as unknown[]);
+    }
     return { ok: true };
   } catch (err: unknown) {
     const msg = err && typeof err === "object" && "code" in err && (err as { code: string }).code === "23505"
@@ -551,10 +627,11 @@ fastify.post<{
       return reply.status(400).send({ error: "Email and password are required." });
     }
     const hashed = await bcrypt.hash(password, 10);
+    const newUuid = randomUUID();
     await pool.query(
-      `INSERT INTO users (email, password, name, role, persona_id, is_admin)
-       VALUES ($1, $2, $3, COALESCE(NULLIF($4, ''), 'User'), $5, FALSE)`,
-      [email.toLowerCase().trim(), hashed, (name || email).trim(), role ?? "User", persona_id ?? null],
+      `INSERT INTO users (email, password, name, role, persona_id, is_admin, uuid)
+       VALUES ($1, $2, $3, COALESCE(NULLIF($4, ''), 'User'), $5, FALSE, $6)`,
+      [email.toLowerCase().trim(), hashed, (name || email).trim(), role ?? "User", persona_id ?? null, newUuid],
     );
     return { ok: true };
   } catch (err: unknown) {

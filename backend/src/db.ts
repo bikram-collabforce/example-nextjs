@@ -58,8 +58,25 @@ export async function initDb() {
   `);
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS persona_id INTEGER REFERENCES persona(id)");
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) UNIQUE");
   await pool.query("ALTER TABLE users DROP COLUMN IF EXISTS role_id");
   await pool.query("DROP TABLE IF EXISTS roles");
+
+  // ─── Composio webhook events (store each webhook call) ───
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS composio_webhook_events (
+      id SERIAL PRIMARY KEY,
+      received_at TIMESTAMP DEFAULT NOW(),
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      composio_user_id VARCHAR(36),
+      type VARCHAR(80),
+      trigger_slug VARCHAR(80),
+      trigger_id VARCHAR(120),
+      connected_account_id VARCHAR(120),
+      metadata JSONB,
+      data JSONB
+    )
+  `);
 
   // ─── Dashboard tables (user_id only; no persona_id) ───
   await pool.query(`
@@ -235,6 +252,7 @@ export async function initDb() {
 export async function factoryReset() {
   await pool.query(`
     DROP TABLE IF EXISTS
+      composio_webhook_events,
       user_oauth_connections,
       highlights,
       meeting_summaries,

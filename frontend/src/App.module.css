@@ -1117,6 +1117,13 @@
   background: var(--body-bg);
 }
 
+.uuidCell {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+  max-width: 180px;
+}
+
 .userEditBtn {
   padding: 6px 14px;
   font-size: 0.82rem;
