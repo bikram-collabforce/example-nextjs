@@ -5,6 +5,9 @@ import jwt from "jsonwebtoken";
 import { pool, initDb, factoryReset } from "./db";
 
 const JWT_SECRET = "digital-twin-secret-key-2024";
+const COMPOSIO_BASE = "https://backend.composio.dev/api/v3";
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:4000";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 const fastify = Fastify({ logger: true });
 
@@ -147,6 +150,152 @@ fastify.get("/api/me/connections", async (request, reply) => {
   }
 });
 
+// ─── Composio Gmail: get Connect Link URL ───
+fastify.get("/api/integrations/gmail/connect", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+    const { rows: gmailRows } = await pool.query(
+      "SELECT id, api_key, enabled FROM integrations WHERE service_key = $1",
+      ["gmail"],
+    );
+    if (gmailRows.length === 0 || !gmailRows[0].api_key || !gmailRows[0].enabled) {
+      return reply.status(400).send({ error: "Gmail integration not configured or not enabled." });
+    }
+    const apiKey = gmailRows[0].api_key;
+    const userId = String(payload.id);
+    const callbackUrl = `${BACKEND_URL}/api/integrations/gmail/callback?user_id=${userId}`;
+
+    const authRes = await fetch(`${COMPOSIO_BASE}/auth_configs?toolkit_slug=gmail&limit=5`, {
+      headers: { "x-api-key": apiKey },
+    });
+    if (!authRes.ok) {
+      fastify.log.error({ status: authRes.status }, "Composio auth_configs failed");
+      return reply.status(502).send({ error: "Failed to get Gmail auth config from Composio." });
+    }
+    const authData = (await authRes.json()) as { items?: { id: string }[] };
+    const authConfigId = authData.items?.[0]?.id;
+    if (!authConfigId) {
+      return reply.status(502).send({ error: "No Gmail auth config found in Composio." });
+    }
+
+    const linkRes = await fetch(`${COMPOSIO_BASE}/connected_accounts/link`, {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: userId,
+        auth_config_id: authConfigId,
+        callback_url: callbackUrl,
+      }),
+    });
+    if (!linkRes.ok) {
+      const errText = await linkRes.text();
+      fastify.log.error({ status: linkRes.status, body: errText }, "Composio link failed");
+      return reply.status(502).send({ error: "Failed to create Composio connection link." });
+    }
+    const linkData = (await linkRes.json()) as { redirect_url?: string };
+    const redirectUrl = linkData.redirect_url;
+    if (!redirectUrl) {
+      return reply.status(502).send({ error: "No redirect URL from Composio." });
+    }
+    return { redirectUrl };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: "Server error." });
+  }
+});
+
+// ─── Composio Gmail: OAuth callback (Composio redirects here) ───
+fastify.get<{ Querystring: { user_id?: string; status?: string; connected_account_id?: string } }>(
+  "/api/integrations/gmail/callback",
+  async (request, reply) => {
+    const { user_id: userIdParam, status, connected_account_id: composioConnectedAccountId } = request.query;
+    const frontendSettings = `${FRONTEND_URL}/settings?gmail=connected`;
+    if (!userIdParam || status !== "success" || !composioConnectedAccountId) {
+      return reply.redirect(`${frontendSettings}&error=callback_params`, 302);
+    }
+    const userId = parseInt(userIdParam, 10);
+    if (Number.isNaN(userId)) {
+      return reply.redirect(`${frontendSettings}&error=invalid_user`, 302);
+    }
+    try {
+      const { rows: userRows } = await pool.query("SELECT id FROM users WHERE id = $1", [userId] as unknown[]);
+      if (userRows.length === 0) {
+        return reply.redirect(`${frontendSettings}&error=user_not_found`, 302);
+      }
+      const { rows: gmailRows } = await pool.query(
+        "SELECT id, api_key FROM integrations WHERE service_key = $1",
+        ["gmail"] as unknown[],
+      );
+      if (gmailRows.length === 0 || !gmailRows[0].api_key) {
+        return reply.redirect(`${frontendSettings}&error=integration_not_configured`, 302);
+      }
+      const integrationId = gmailRows[0].id;
+      const apiKey = gmailRows[0].api_key;
+
+      await pool.query(
+        `INSERT INTO user_oauth_connections (user_id, integration_id, composio_connected_account_id, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (user_id, integration_id) DO UPDATE SET
+           composio_connected_account_id = EXCLUDED.composio_connected_account_id,
+           updated_at = NOW()`,
+        [userId, integrationId, composioConnectedAccountId] as unknown[],
+      );
+
+      const triggerRes = await fetch(`${COMPOSIO_BASE}/trigger_instances/GMAIL_NEW_GMAIL_MESSAGE/upsert`, {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          connected_account_id: composioConnectedAccountId,
+          trigger_config: {},
+        }),
+      });
+      if (!triggerRes.ok) {
+        fastify.log.warn({ status: triggerRes.status }, "Composio trigger create failed (connection still saved)");
+      }
+
+      return reply.redirect(frontendSettings, 302);
+    } catch (err) {
+      fastify.log.error(err);
+      return reply.redirect(`${frontendSettings}&error=server`, 302);
+    }
+  },
+);
+
+// ─── Composio webhook: receive trigger events (e.g. new Gmail message) ───
+fastify.get("/api/webhooks/composio", async (_request, reply) => {
+  return reply.status(200).send({
+    message: "Composio webhook endpoint. Composio sends POST requests here; this GET is only for testing reachability.",
+    method: "GET",
+    expect: "POST from Composio with trigger events",
+  });
+});
+
+fastify.post("/api/webhooks/composio", async (request, reply) => {
+  console.log("[Composio Webhook] POST received at", new Date().toISOString());
+  const payload = request.body as Record<string, unknown>;
+  const type = payload?.type as string | undefined;
+  const metadata = payload?.metadata as Record<string, unknown> | undefined;
+  const data = payload?.data as Record<string, unknown> | undefined;
+  const triggerSlug = metadata?.trigger_slug as string | undefined;
+
+  console.log("[Composio Webhook] Full payload:", JSON.stringify(payload, null, 2));
+
+  if (type === "composio.trigger.message" && triggerSlug === "GMAIL_NEW_GMAIL_MESSAGE" && data) {
+    const from = (data.from ?? data.sender ?? data.fromEmail ?? "—") as string;
+    const subject = (data.subject ?? data.title ?? "—") as string;
+    const snippet = (data.snippet ?? data.bodyPreview ?? data.preview ?? "") as string;
+    const id = (data.id ?? data.messageId ?? data.message_id ?? "") as string;
+    const formatted = `[Gmail] New email | From: ${from} | Subject: ${subject} | Snippet: ${String(snippet).slice(0, 120)} | Id: ${id}`;
+    console.log("[Composio Webhook] " + formatted);
+  }
+
+  return reply.status(200).send({ status: "ok" });
+});
+
 fastify.get("/api/admin/integrations", async (request, reply) => {
   const auth = request.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
@@ -164,7 +313,8 @@ fastify.get("/api/admin/integrations", async (request, reply) => {
     const { rows } = await pool.query(
       `SELECT service_key AS "serviceKey", display_name AS "displayName", group_name AS "groupName",
               enabled, client_id AS "clientId", redirect_uri AS "redirectUri",
-              CASE WHEN client_id IS NOT NULL AND client_id != '' THEN true ELSE false END AS "hasCredentials"
+              CASE WHEN (client_id IS NOT NULL AND client_id != '') OR (api_key IS NOT NULL AND api_key != '') THEN true ELSE false END AS "hasCredentials",
+              CASE WHEN api_key IS NOT NULL AND api_key != '' THEN true ELSE false END AS "hasApiKey"
        FROM integrations ORDER BY group_name, display_name`,
     );
     return { integrations: rows };
@@ -182,6 +332,8 @@ fastify.post<{
     clientSecret?: string;
     redirectUri?: string;
     enabled?: boolean;
+    apiKey?: string;
+    webhookSecret?: string;
   };
 }>("/api/admin/integrations", async (request, reply) => {
   const auth = request.headers.authorization;
@@ -197,21 +349,23 @@ fastify.post<{
     if (userRows.length === 0 || !userRows[0].is_admin) {
       return reply.status(403).send({ error: "Access denied." });
     }
-    const { serviceKey, displayName, groupName, clientId, clientSecret, redirectUri, enabled } = request.body;
+    const { serviceKey, displayName, groupName, clientId, clientSecret, redirectUri, enabled, apiKey, webhookSecret } = request.body;
     if (!serviceKey) {
       return reply.status(400).send({ error: "serviceKey is required." });
     }
     const sk = String(serviceKey);
     await pool.query(
-      `INSERT INTO integrations (service_key, display_name, group_name, enabled, client_id, client_secret, redirect_uri, updated_at)
-       VALUES ($1::varchar, COALESCE(NULLIF($2, ''), $1)::varchar, COALESCE(NULLIF($3, ''), 'Other')::varchar, $4::boolean, $5, $6, $7, NOW())
+      `INSERT INTO integrations (service_key, display_name, group_name, enabled, client_id, client_secret, redirect_uri, api_key, webhook_secret, updated_at)
+       VALUES ($1::varchar, COALESCE(NULLIF($2, ''), $1)::varchar, COALESCE(NULLIF($3, ''), 'Other')::varchar, $4::boolean, $5, $6, $7, $8, $9, NOW())
        ON CONFLICT (service_key) DO UPDATE SET
          enabled = COALESCE($4::boolean, integrations.enabled),
          client_id = COALESCE(NULLIF($5, ''), integrations.client_id),
          client_secret = CASE WHEN $6 IS NOT NULL AND $6 != '' THEN $6 ELSE integrations.client_secret END,
          redirect_uri = COALESCE(NULLIF($7, ''), integrations.redirect_uri),
+         api_key = CASE WHEN $8 IS NOT NULL AND $8 != '' THEN $8 ELSE integrations.api_key END,
+         webhook_secret = CASE WHEN $9 IS NOT NULL AND $9 != '' THEN $9 ELSE integrations.webhook_secret END,
          updated_at = NOW()`,
-      [sk, displayName ?? null, groupName ?? null, enabled ?? false, clientId ?? null, clientSecret ?? null, redirectUri ?? null],
+      [sk, displayName ?? null, groupName ?? null, enabled ?? false, clientId ?? null, clientSecret ?? null, redirectUri ?? null, apiKey ?? null, webhookSecret ?? null],
     );
     const { rows } = await pool.query(
       `SELECT service_key AS "serviceKey", display_name AS "displayName", group_name AS "groupName", enabled

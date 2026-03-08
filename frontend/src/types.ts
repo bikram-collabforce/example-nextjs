@@ -60,4 +60,5 @@ export interface Integration {
   clientId: string | null;
   redirectUri: string | null;
   hasCredentials: boolean;
+  hasApiKey?: boolean;
 }

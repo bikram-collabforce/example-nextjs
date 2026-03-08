@@ -1,0 +1,183 @@
+[Composio Webhook] POST received at 2026-03-08T09:16:17.008Z
+[Composio Webhook] Full payload: {
+  "id": "msg_07974b02-3bcc-4b25-ac12-33c743261087",
+  "timestamp": "2026-03-08T09:16:16.565Z",
+  "type": "composio.trigger.message",
+  "metadata": {
+    "log_id": "log_3ijBJ6a2gtgR",
+    "trigger_slug": "GMAIL_NEW_GMAIL_MESSAGE",
+    "trigger_id": "ti_ZlgE4uCkYMUA",
+    "connected_account_id": "ca_LnCMKH4XwQtm",
+    "auth_config_id": "ac_MvpCiZVrAeNr",
+    "user_id": "5"
+  },
+  "data": {
+    "attachment_list": [],
+    "id": "19cccbabe6c8d3ca",
+    "label_ids": [
+      "UNREAD",
+      "IMPORTANT",
+      "CATEGORY_PERSONAL",
+      "INBOX"
+    ],
+    "message_id": "19cccbabe6c8d3ca",
+    "message_text": "-- \r\nThanks\r\nBikramaditya\r\n",
+    "message_timestamp": "2026-03-08T09:15:05Z",
+    "payload": {
+      "body": {
+        "size": 0
+      },
+      "filename": "",
+      "headers": [
+        {
+          "name": "Delivered-To",
+          "value": "bikramrequester@gmail.com"
+        },
+        {
+          "name": "Received",
+          "value": "by 2002:a05:7022:7f19:b0:128:d353:bc95 with SMTP id vg25csp226976dlb;        Sun, 8 Mar 2026 01:15:16 -0800 (PST)"
+        },
+        {
+          "name": "X-Received",
+          "value": "by 2002:a05:6214:2481:b0:894:61c9:9793 with SMTP id 6a1803df08f44-89a307d5d70mr115732626d6.5.1772961316571;        Sun, 08 Mar 2026 01:15:16 -0800 (PST)"
+        },
+        {
+          "name": "ARC-Seal",
+          "value": "i=2; a=rsa-sha256; t=1772961316; cv=pass;        d=google.com; s=arc-20240605;        b=FKBHlZx6gdF/5QIioP0M/P1pJWX/OA0Nc6Y7NM5XZCnUQZ6T7zZqQU2igctYLtnFsj         26yppwSKBxOuqBcVvnzL/ZajToh1tXJeu6y2R53Ui0ybSbX1SJtVjEL0zL+7FhCzi9kE         cF65LSnkLgc0ApZwlrV7hRu7QurqhALCSsjKvPzO7mtggUv3dwhmEhIyAPfmypCN8yc9         cjSij3BXkpgUx8WIHwi0QWmNbj1wSoHnaZtHuYmy+vW8Vvs67Bib1QOtR68QqKq/u+XY         jQZ1qfdnq+Dn438o1JAu/jyMc8prxbwOIN9w7HYcTLEvJWtbltgb5wygcZHFRRTk+ZML         IGoA=="
+        },
+        {
+          "name": "ARC-Message-Signature",
+          "value": "i=2; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;        h=to:subject:message-id:date:from:mime-version:dkim-signature;        bh=9FFAhyVWl79PVIYZMVSXrK4UDjQhFXvJkPWbwliWjBA=;        fh=vr4m9EC0Q0fvE1Zu5IWcSMfDG8R8b4LQoMc7bF1yL2M=;        b=DnOzct2nq7SxDCEZ44T5V9MTaosBsC5HdYoFB7ZRu9rKd4RU5wfBEr/zU2kEBdStJj         7tSpLmxsEqTpOF+d6xzizLClYDOU75+1vE4YqVGCz43Tgs0YI1Cy0OWeqdte99RoZTeq         LevwHpYkS0iWvv+5YyTz4GJLS1qdNCLyRNwN4U1fa7Hua4Tx3brR5B4BW0dH5v/VgMA9         HDcHFGb/zGUTuFrbrdm/N4iJ7BxTSUc7ROZ57+bAbvUOKAT9lfCUsCKXlZg1V6CW/bid         toyk/zXtpYa9x57WUkMcrLzV2l848ciO4wTHtk4WHyiMxo/o3dlqWTrDl10vVgW/FGks         epQQ==;        dara=google.com"
+        },
+        {
+          "name": "ARC-Authentication-Results",
+          "value": "i=2; mx.google.com;       dkim=pass header.i=@gmail.com header.s=20230601 header.b=cws9aTMo;       arc=pass (i=1);       spf=pass (google.com: domain of bikramaditya@gmail.com designates 209.85.220.41 as permitted sender) smtp.mailfrom=bikramaditya@gmail.com;       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com;       dara=pass header.i=@gmail.com"
+        },
+        {
+          "name": "Return-Path",
+          "value": "<bikramaditya@gmail.com>"
+        },
+        {
+          "name": "Received",
+          "value": "from mail-sor-f41.google.com (mail-sor-f41.google.com. [209.85.220.41])        by mx.google.com with SMTPS id 6a1803df08f44-89a31739bdbsor26209596d6.6.2026.03.08.01.15.16        for <bikramrequester@gmail.com>        (Google Transport Security);        Sun, 08 Mar 2026 01:15:16 -0800 (PST)"
+        },
+        {
+          "name": "Received-SPF",
+          "value": "pass (google.com: domain of bikramaditya@gmail.com designates 209.85.220.41 as permitted sender) client-ip=209.85.220.41;"
+        },
+        {
+          "name": "Authentication-Results",
+          "value": "mx.google.com;       dkim=pass header.i=@gmail.com header.s=20230601 header.b=cws9aTMo;       arc=pass (i=1);       spf=pass (google.com: domain of bikramaditya@gmail.com designates 209.85.220.41 as permitted sender) smtp.mailfrom=bikramaditya@gmail.com;       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com;       dara=pass header.i=@gmail.com"
+        },
+        {
+          "name": "ARC-Seal",
+          "value": "i=1; a=rsa-sha256; t=1772961316; cv=none;        d=google.com; s=arc-20240605;        b=ip0HGMfblSHCdVQfubrbjT2jHa5VjMhMA710lyAX4eLHxrqIfpD8Hk+x913WoD2STh         QWAHqcRsiGMkEmmpjwfynoTOhZj/Ois1G6tqeryRgu+MHcb5G0UbpvfbR+IT//RyQ2IL         xIyHs040ixicKONscYzWe7pQY0kw/rqQnFlMn6/k81w/pk9SRkpxDChh6aVTzITRw4j3         CqDCEu4FyxP4zZBA/JSlP90rW/IH1GBcVCIvrMeSxxAR4ret5nIOwp+uApG8m+iwknlb         altMF75GfEVMnwzNN2TQaCJvhUqeNDmPkcivMlpYaxihVvYpRK5UKO+sXQ8kKQGKG1w2         xoSg=="
+        },
+        {
+          "name": "ARC-Message-Signature",
+          "value": "i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;        h=to:subject:message-id:date:from:mime-version:dkim-signature;        bh=9FFAhyVWl79PVIYZMVSXrK4UDjQhFXvJkPWbwliWjBA=;        fh=vr4m9EC0Q0fvE1Zu5IWcSMfDG8R8b4LQoMc7bF1yL2M=;        b=Wq0IGE7sFQtWU2TIX9jl8xOFI2BxyXI9mpqndBtI9sDmQmL3IfmKUmUVOCQDb613VQ         JJoyR1ahmw7dqJUrQthiHV95mUAVJ8d5rsIwYaoL/881pKhsdbaQJflYWG+MbMheRQGd         0UxssDR/BwixYb1gnWvhhdQ3mj0qiDL4hmrafHcvvE8txDcSOjfY4Xn9wEOcAGH1nD19         rv//KkqfI1mJ4PEsIA4RGytbKO/d+vVY4FAxRVkqXJSeX++vjZNjcuNhY6aAe/2hklWq         plPkhNhMfY6tPWnHwOsn5yOTutCWeM1A0QiOLOGHBeje37CPZt78x9AMV/aN9CBZDUTN         1BxA==;        dara=google.com"
+        },
+        {
+          "name": "ARC-Authentication-Results",
+          "value": "i=1; mx.google.com; arc=none"
+        },
+        {
+          "name": "DKIM-Signature",
+          "value": "v=1; a=rsa-sha256; c=relaxed/relaxed;        d=gmail.com; s=20230601; t=1772961316; x=1773566116; dara=google.com;        h=to:subject:message-id:date:from:mime-version:from:to:cc:subject         :date:message-id:reply-to;        bh=9FFAhyVWl79PVIYZMVSXrK4UDjQhFXvJkPWbwliWjBA=;        b=cws9aTMoMdhyU+m4elz7nd/KeZKn90OVlMsp+fTr2V39ZKtuqVRftQlf32iHoBgLgx         ehuJSZz7M4AL86hrR3S/qwF+SdOb4nRSTJEj+OtNhW3wR/8okGSIg1kJfuvP7yq7nFRl         Ph+6gPbq7Ks1Cigyxd46TVsUBFdw2d2+2+pcrfId5961U2rZdS9VdAAbl7my5V2NraJ/         lMKhUhzeP4LxgTN6/F+s4DNqv3ebXr4jA5nkZoXHCxtKm6R5pOVKp6TPgXfHsZO6IDy7         Hlshe8ymxZvaBr0Qkp8t3rR6LWpAV/s56bWFZs09NDwmDFWMvK4hQRvqvZbL9S296aez         XOvA=="
+        },
+        {
+          "name": "X-Google-DKIM-Signature",
+          "value": "v=1; a=rsa-sha256; c=relaxed/relaxed;        d=1e100.net; s=20230601; t=1772961316; x=1773566116;        h=to:subject:message-id:date:from:mime-version:x-gm-gg         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;        bh=9FFAhyVWl79PVIYZMVSXrK4UDjQhFXvJkPWbwliWjBA=;        b=G+6UG2sq+dAqz0zRMUtCyMxJkRNUPr/WFcepDnp13jUfRaBK4FDxNdZzWGOw2UPH0+         9CCX76/1AklXOw9hjtNc8AAMTDJCHgKYaFaqgUJHH3vCt2Qc7o5Za3BIoMb6PQ+DMtsA         Q21JUbI8Ab80Xih0zTF+TGxIAKn8I3J9qbpS0Jw300QsRwUoBpgqLHmh6kRvoHxyatY1         gjgTc4Of8o8iGDbuY+Elm54loJZuEs23TOIFuhE5DHuCj+RfG+qoXkF9VNZm73qKZWuH         ow6eLO9OARv/LU5cRUNa8OPcvsXoVlrnZlVI5bk4GCGyRF6JGOsbCAOMohgrxdfMLrJV         pj2w=="
+        },
+        {
+          "name": "X-Gm-Message-State",
+          "value": "AOJu0YzRvW9uvyuDG/e3gTjrltllS8dIOvXjrZCPti80Trke0KKTkvgg Z3wxuUx2qVZtnhITTjp5ooYHt64CrHTEwE4qjaf+mKSoP++e0kF9lbeHCqvs5AzQh62S1a8WXxG eksYt0B/CKfjIEe6TCg0EZjqqR16929UpVQ=="
+        },
+        {
+          "name": "X-Gm-Gg",
+          "value": "ATEYQzy63dE++BN/TXA+69Az8TLb8fhS2XBBWVotZ4B5X72fMQYps8sgmVycLNDHYIh le179Ix3DPQQcK8YVbqJmTE2C5koDy0GodhViQPxkBL9ICY9SeKs40holnA237Flv+ev3xkXQpk s+s4e0dXH8Ape1e5pjuNszaNapquXQQNGugRea4c+BZcP1xhTqpSrnj8Q2NebRkyzMO27V+UkCa qMLLeqZjG160MVc+eUmtG7qPiQxW551FWckcamcOCoTbZI7rzPUlmQ/IYpUu3nQWYP7aDa/828l arXUJAIU+RN+F7JesPuq"
+        },
+        {
+          "name": "X-Received",
+          "value": "by 2002:a05:6214:1bc8:b0:899:fa7f:7144 with SMTP id 6a1803df08f44-89a247f5bc5mr161952586d6.26.1772961316041; Sun, 08 Mar 2026 01:15:16 -0800 (PST)"
+        },
+        {
+          "name": "MIME-Version",
+          "value": "1.0"
+        },
+        {
+          "name": "From",
+          "value": "Bikramaditya Padhi <bikramaditya@gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Sun, 8 Mar 2026 14:45:05 +0530"
+        },
+        {
+          "name": "X-Gm-Features",
+          "value": "AaiRm5218GtlXuHx84e1blW1AvY3xvhVWGovFk8P3xUquoNrOkHT3KdtYurcxPg"
+        },
+        {
+          "name": "Message-ID",
+          "value": "<CAOg-YC9pzEoWZpLjhB+n24zoFe2UZUZjCe_maKYGpqs5VH32+Q@mail.gmail.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "zxdcszd 345678"
+        },
+        {
+          "name": "To",
+          "value": "bikramrequester@gmail.com"
+        },
+        {
+          "name": "Content-Type",
+          "value": "multipart/alternative; boundary=\"0000000000007178c4064c7fb997\""
+        }
+      ],
+      "mimeType": "multipart/alternative",
+      "partId": "",
+      "parts": [
+        {
+          "body": {
+            "data": "LS0gDQpUaGFua3MNCkJpa3JhbWFkaXR5YQ0K",
+            "size": 27
+          },
+          "filename": "",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain; charset=\"UTF-8\""
+            }
+          ],
+          "mimeType": "text/plain",
+          "partId": "0"
+        },
+        {
+          "body": {
+            "data": "PGRpdiBkaXI9Imx0ciI-PGRpdj48YnIgY2xlYXI9ImFsbCI-PC9kaXY-PGJyPjxzcGFuIGNsYXNzPSJnbWFpbF9zaWduYXR1cmVfcHJlZml4Ij4tLSA8L3NwYW4-PGJyPjxkaXYgZGlyPSJsdHIiIGNsYXNzPSJnbWFpbF9zaWduYXR1cmUiIGRhdGEtc21hcnRtYWlsPSJnbWFpbF9zaWduYXR1cmUiPlRoYW5rczxicj5CaWtyYW1hZGl0eWE8L2Rpdj48L2Rpdj4NCg==",
+            "size": 205
+          },
+          "filename": "",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "text/html; charset=\"UTF-8\""
+            }
+          ],
+          "mimeType": "text/html",
+          "partId": "1"
+        }
+      ]
+    },
+    "preview": {
+      "body": "-- Thanks Bikramaditya",
+      "subject": "zxdcszd 345678"
+    },
+    "sender": "Bikramaditya Padhi <bikramaditya@gmail.com>",
+    "subject": "zxdcszd 345678",
+    "thread_id": "19cccbabe6c8d3ca",
+    "to": "bikramrequester@gmail.com"
+  }
+}
+[Composio Webhook] [Gmail] New email | From: Bikramaditya Padhi <bikramaditya@gmail.com> | Subject: zxdcszd 345678 | Snippet: [object Object] | Id: 19cccbabe6c8d3ca
+{"level":30,"time":1772961377011,"pid":49148,"hostname":"bpadhi-ltmtywb.internal.salesforce.com","reqId":"req-d","res":{"statusCode":200},"responseTime":4.414834000170231,"msg":"request completed"}

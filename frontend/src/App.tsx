@@ -69,7 +69,7 @@ export default function App() {
   const [integrations, setIntegrations] = useState<Integration[] | null>(null);
   const [integrationsError, setIntegrationsError] = useState<string | null>(null);
   const [integrationModal, setIntegrationModal] = useState<Integration | null>(null);
-  const [oauthForm, setOauthForm] = useState({ clientId: "", clientSecret: "", redirectUri: "", enabled: false });
+  const [oauthForm, setOauthForm] = useState({ clientId: "", clientSecret: "", redirectUri: "", enabled: false, apiKey: "", webhookSecret: "" });
   const [savingIntegration, setSavingIntegration] = useState(false);
   const [adminSubTab, setAdminSubTab] = useState<"integrations" | "users">("integrations");
   interface PersonaOption { id: number; name: string }
@@ -234,6 +234,12 @@ export default function App() {
   }, [token, activeView, adminSubTab, usersPage]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("gmail=connected")) {
+      setActiveView("settings");
+      setSettingsTab("integrations");
+    }
+  }, []);
+  useEffect(() => {
     if (!token || activeView !== "settings") return;
     setSettingsError(null);
     setSettingsLoading(true);
@@ -260,12 +266,14 @@ export default function App() {
       clientSecret: "",
       redirectUri: integration.redirectUri ?? "",
       enabled: integration.enabled,
+      apiKey: "",
+      webhookSecret: "",
     });
   }, []);
 
   const closeIntegrationModal = useCallback(() => {
     setIntegrationModal(null);
-    setOauthForm({ clientId: "", clientSecret: "", redirectUri: "", enabled: false });
+    setOauthForm({ clientId: "", clientSecret: "", redirectUri: "", enabled: false, apiKey: "", webhookSecret: "" });
   }, []);
 
   const saveIntegration = useCallback(async () => {
@@ -286,6 +294,8 @@ export default function App() {
           clientSecret: oauthForm.clientSecret || undefined,
           redirectUri: oauthForm.redirectUri || undefined,
           enabled: oauthForm.enabled,
+          apiKey: oauthForm.apiKey || undefined,
+          webhookSecret: oauthForm.webhookSecret || undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -774,7 +784,20 @@ export default function App() {
                                 <button
                                   type="button"
                                   className={styles.settingsConnectBtn}
-                                  onClick={() => {}}
+                                  onClick={async () => {
+                                    if (int.serviceKey === "gmail" && token) {
+                                      try {
+                                        const r = await fetch(`${API_BASE}/api/integrations/gmail/connect`, {
+                                          headers: { Authorization: `Bearer ${token}` },
+                                        });
+                                        const d = await r.json();
+                                        if (d.redirectUrl) window.location.href = d.redirectUrl;
+                                        else if (d.error) setSettingsError(d.error);
+                                      } catch {
+                                        setSettingsError("Failed to get connection link.");
+                                      }
+                                    }
+                                  }}
                                 >
                                   Connect now
                                 </button>
@@ -1393,6 +1416,34 @@ export default function App() {
                     placeholder="https://..."
                   />
                 </label>
+                {integrationModal.serviceKey === "gmail" && (
+                  <>
+                    <label className={styles.oauthLabel}>
+                      Composio API Key
+                      <input
+                        type="password"
+                        className={styles.oauthInput}
+                        value={oauthForm.apiKey}
+                        onChange={(e) =>
+                          setOauthForm((f) => ({ ...f, apiKey: e.target.value }))
+                        }
+                        placeholder="Paste from Composio dashboard"
+                      />
+                    </label>
+                    <label className={styles.oauthLabel}>
+                      Webhook secret (optional)
+                      <input
+                        type="password"
+                        className={styles.oauthInput}
+                        value={oauthForm.webhookSecret}
+                        onChange={(e) =>
+                          setOauthForm((f) => ({ ...f, webhookSecret: e.target.value }))
+                        }
+                        placeholder="For webhook signature verification"
+                      />
+                    </label>
+                  </>
+                )}
                 <label className={styles.oauthCheckboxLabel}>
                   <input
                     type="checkbox"

@@ -174,6 +174,16 @@ export async function initDb() {
   await pool.query("ALTER TABLE integrations DROP COLUMN IF EXISTS access_token");
   await pool.query("ALTER TABLE integrations DROP COLUMN IF EXISTS refresh_token");
   await pool.query("ALTER TABLE integrations DROP COLUMN IF EXISTS token_expires_at");
+  await pool.query("ALTER TABLE integrations ADD COLUMN IF NOT EXISTS api_key TEXT");
+  await pool.query("ALTER TABLE integrations ADD COLUMN IF NOT EXISTS webhook_secret TEXT");
+  await pool.query("ALTER TABLE user_oauth_connections ADD COLUMN IF NOT EXISTS composio_connected_account_id VARCHAR(255)");
+
+  // Ensure Gmail integration row exists (for Composio)
+  await pool.query(
+    `INSERT INTO integrations (service_key, display_name, group_name, enabled, updated_at)
+     VALUES ('gmail', 'Gmail', 'Messaging & Email', FALSE, NOW())
+     ON CONFLICT (service_key) DO NOTHING`,
+  );
 
   // ─── Data seeding commented out ───
   // const { rows: personaCheck } = await pool.query("SELECT COUNT(*) FROM persona");
