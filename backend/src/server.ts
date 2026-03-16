@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
@@ -9,6 +10,9 @@ const JWT_SECRET = "digital-twin-secret-key-2024";
 const COMPOSIO_BASE = "https://backend.composio.dev/api/v3";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:4000";
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const VAPI_API_KEY = process.env.VAPI_API_KEY;
+const VAPI_ASSISTANT_ID = process.env.VAPI_ASSISTANT_ID;
+const VAPI_PHONE_NUMBER_ID = process.env.VAPI_PHONE_NUMBER_ID;
 
 const fastify = Fastify({ logger: true });
 
@@ -332,6 +336,46 @@ fastify.post("/api/webhooks/composio", async (request, reply) => {
   }
 
   return reply.status(200).send({ status: "ok" });
+});
+
+// ─── VAPI: start outbound phone call to hardcoded number ───
+fastify.post("/api/voice/call", async (request, reply) => {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return reply.status(401).send({ error: "Not authenticated." });
+  }
+  try {
+    jwt.verify(auth.slice(7), JWT_SECRET) as { id: number };
+  } catch {
+    return reply.status(401).send({ error: "Invalid or expired token." });
+  }
+  if (!VAPI_API_KEY || !VAPI_ASSISTANT_ID || !VAPI_PHONE_NUMBER_ID) {
+    return reply.status(500).send({ error: "Voice not configured. Set VAPI_API_KEY, VAPI_ASSISTANT_ID, and VAPI_PHONE_NUMBER_ID." });
+  }
+  const vapiRes = await fetch("https://api.vapi.ai/call", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${VAPI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      assistantId: VAPI_ASSISTANT_ID,
+      phoneNumberId: VAPI_PHONE_NUMBER_ID,
+      customer: { number: "+918105141239" },
+      //customer: { number: "+916366533094" },
+      assistantOverrides: {
+        firstMessage: "Hello Bikram, you have a meeting in 2 minutes with Rampi",
+      },
+    }),
+  });
+  const vapiBody = await vapiRes.json().catch(() => ({})) as { id?: string; message?: string };
+  if (!vapiRes.ok) {
+    fastify.log.warn({ status: vapiRes.status, body: vapiBody }, "VAPI call failed");
+    return reply.status(vapiRes.status >= 500 ? 502 : vapiRes.status).send({
+      error: (vapiBody as { message?: string }).message ?? "Failed to start call.",
+    });
+  }
+  return reply.status(200).send({ callId: vapiBody.id ?? null });
 });
 
 fastify.get("/api/admin/integrations", async (request, reply) => {

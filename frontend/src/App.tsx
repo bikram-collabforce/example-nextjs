@@ -100,6 +100,10 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [voiceCallLoading, setVoiceCallLoading] = useState(false);
+  const [voiceCallError, setVoiceCallError] = useState<string | null>(null);
+  const [callAnimationDismissed, setCallAnimationDismissed] = useState(false);
+  const [callBannerVisible, setCallBannerVisible] = useState(false);
   const [chatHistory] = useState<{ id: string; title: string }[]>([
     { id: "current", title: "Current chat" },
     { id: "1", title: "Budget & Q4 review" },
@@ -517,9 +521,56 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [userModalOpen, savingUser, closeUserModal]);
 
+  const startVoiceCall = useCallback(async () => {
+    if (!token || voiceCallLoading) return;
+    setVoiceCallError(null);
+    setCallBannerVisible(true);
+    setCallAnimationDismissed(false);
+    setVoiceCallLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/voice/call`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setVoiceCallError((data as { error?: string }).error ?? "Failed to start call.");
+        return;
+      }
+      setVoiceCallError(null);
+    } catch {
+      setVoiceCallError("Failed to start call.");
+    } finally {
+      setVoiceCallLoading(false);
+    }
+  }, [token, voiceCallLoading]);
+
+  const CALL_SUGGESTION_TEXT = "Tell Bikram here has a call with Rampi in 2 minute";
+
+  const triggerCallBikramFlow = useCallback(() => {
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      text: CALL_SUGGESTION_TEXT,
+    };
+    const assistantMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      text: "Okay, am calling him.",
+    };
+    setChatMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setChatInput("");
+    startVoiceCall();
+  }, [startVoiceCall]);
+
   const sendChat = async () => {
     const text = chatInput.trim();
     if (!text || sending) return;
+
+    if (text === CALL_SUGGESTION_TEXT) {
+      triggerCallBikramFlow();
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -554,6 +605,13 @@ export default function App() {
       setSending(false);
     }
   };
+
+  useEffect(() => {
+    if (voiceCallLoading && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [voiceCallLoading]);
+
 
   if (!token || !user) {
     return <Login apiBase={API_BASE} onLogin={handleLogin} />;
@@ -1086,6 +1144,29 @@ export default function App() {
               <div ref={messagesEndRef} />
             </div>
           )}
+          {voiceCallError && (
+            <div className={styles.adminError}>{voiceCallError}</div>
+          )}
+          {callBannerVisible && !callAnimationDismissed && (
+            <div className={styles.callAnimation}>
+              <span className={styles.callAnimationIcon} aria-hidden>📞</span>
+              <span className={styles.callAnimationText}>
+                {voiceCallLoading ? "Calling Bikram…" : "Call in progress…"}
+              </span>
+              <button
+                type="button"
+                className={styles.callAnimationClose}
+                onClick={() => {
+                  setCallAnimationDismissed(true);
+                  setCallBannerVisible(false);
+                }}
+                aria-label="Close"
+                title="Close"
+              >
+                ×
+              </button>
+            </div>
+          )}
           <div className={styles.chatInputRow}>
             <svg
               width="18"
@@ -1105,7 +1186,14 @@ export default function App() {
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") sendChat();
+                  if (e.key === "Enter") {
+                    const text = chatInput.trim();
+                    if (text === CALL_SUGGESTION_TEXT) {
+                      triggerCallBikramFlow();
+                    } else {
+                      sendChat();
+                    }
+                  }
                 }}
               />
             </div>
@@ -1121,10 +1209,23 @@ export default function App() {
               className={styles.callBtn}
               title="Call"
               aria-label="Call"
+              onClick={startVoiceCall}
+              disabled={voiceCallLoading}
             >
-              <svg className={styles.callIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-              </svg>
+              {voiceCallLoading ? "Calling…" : (
+                <svg className={styles.callIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+              )}
+            </button>
+          </div>
+          <div className={styles.chatSuggestion}>
+            <button
+              type="button"
+              className={styles.chatSuggestionChip}
+              onClick={() => setChatInput(CALL_SUGGESTION_TEXT)}
+            >
+              Tell Bikram here has a call with Rampi in 2 minute
             </button>
           </div>
         </div>
