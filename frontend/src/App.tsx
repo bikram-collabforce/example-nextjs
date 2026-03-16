@@ -579,7 +579,7 @@ export default function App() {
       <aside className={`${styles.sidebar} ${mobileMenuOpen ? styles.sidebarOpen : ""}`}>
         <div className={styles.logo}>
           <span className={styles.logoIcon}>⚡</span>
-          Digital Twin
+          Jarvis
         </div>
 
         <div className={styles.sidebarSection}>Main</div>
@@ -650,7 +650,7 @@ export default function App() {
 
         <div className={styles.sidebarFooter}>
           <div className={styles.sidebarFooterText}>
-            Digital Twin v0.1<br />Your AI work assistant
+            Jarvis v0.1<br />Your AI work assistant
           </div>
         </div>
       </aside>

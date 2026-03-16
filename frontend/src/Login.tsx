@@ -68,9 +68,9 @@ export default function Login({ apiBase, onLogin }: LoginProps) {
       <div className={styles.card}>
         <div className={styles.logoRow}>
           <span className={styles.logoIcon}>⚡</span>
-          <span className={styles.logoText}>Digital Twin</span>
+          <span className={styles.logoText}>Jarvis</span>
         </div>
-        <p className={styles.subtitle}>Sign in to your Digital Twin Assistant</p>
+        <p className={styles.subtitle}>Sign in to your Jarvis Assistant</p>
 
         {error && <div className={styles.error}>{error}</div>}
 
@@ -147,7 +147,7 @@ export default function Login({ apiBase, onLogin }: LoginProps) {
           </div>
         </div>
 
-        <div className={styles.footer}>© 2026 Digital Twin · CollabForce</div>
+        <div className={styles.footer}>© 2026 Jarvis · CollabForce</div>
       </div>
     </div>
   );

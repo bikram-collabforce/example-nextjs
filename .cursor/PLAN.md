@@ -1,4 +1,4 @@
-# Digital Twin — Conversation & Plan Log
+# Jarvis — Conversation & Plan Log
 
 Summary of decisions and changes from our sessions. Use this for context and continuity.
 
@@ -35,7 +35,7 @@ Summary of decisions and changes from our sessions. Use this for context and con
   - No Settings in top bar.
 
 - **Sidebar footer**  
-  “Digital Twin v0.1 / Your AI work assistant” pinned to bottom via `margin-top: auto` and `flex-shrink: 0` on `.sidebarFooter`.
+  “Jarvis v0.1 / Your AI work assistant” pinned to bottom via `margin-top: auto` and `flex-shrink: 0` on `.sidebarFooter`.
 
 - **Chat history (left nav)**  
   - Section at bottom of sidebar with “Chats” and indented list (e.g. Current chat, Budget & Q4 review, …).  
